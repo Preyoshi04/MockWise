@@ -8,18 +8,24 @@ export async function POST(req: Request) {
     const body = await req.json();
     console.log("Incoming Webhook Type:", body.message?.type);
 
-    // Vapi sends 'tool-calls' when the assistant triggers your function
     if (body.message?.type === "tool-calls") {
       const toolCall = body.message.toolCalls[0];
       
       if (toolCall.function.name === "evaluate_interview") {
-        // AI sends arguments as a string, we MUST parse it
-        const args = JSON.parse(toolCall.function.arguments);
-        console.log("Parsed Arguments:", args);
+        // --- CHANGE START ---
+        // Handle cases where arguments are already parsed as an object
+        let args;
+        if (typeof toolCall.function.arguments === 'string') {
+          args = JSON.parse(toolCall.function.arguments);
+        } else {
+          args = toolCall.function.arguments;
+        }
+        // --- CHANGE END ---
 
-        // Save to Firestore
+        console.log("Saving data for User:", args.userId);
+
         const docRef = await addDoc(collection(db, "interviews"), {
-          userId: args.userId,
+          userId: args.userId || "unknown",
           role: args.role || "Technical Interview",
           techStack: args.techStack || "General",
           level: args.level || "Standard",
@@ -34,8 +40,8 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ received: true });
-  } catch (error) {
-    console.error("WEBHOOK ERROR:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  } catch (error: any) { // Changed to 'any' to access .message
+    console.error("WEBHOOK ERROR:", error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
