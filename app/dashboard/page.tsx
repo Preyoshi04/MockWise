@@ -6,6 +6,24 @@ import { signOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import Link from "next/link";
+import Cookies from "js-cookie";
+
+// UI Components (Shadcn)
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+
+import { 
+  LogOut, 
+  PlusCircle, 
+  History, 
+  TrendingUp, 
+  Trophy, 
+  ChevronRight,
+  User,
+  Loader2
+} from "lucide-react";
 
 export default function Dashboard() {
   const { user, loading } = useAuth();
@@ -13,14 +31,12 @@ export default function Dashboard() {
   const [interviews, setInterviews] = useState<any[]>([]);
   const [fetching, setFetching] = useState(true);
 
-  // 1. Protect the Route
   useEffect(() => {
     if (!loading && !user) {
       router.push("/auth/login");
     }
   }, [user, loading, router]);
 
-  // 2. Fetch User Interviews from Firestore
   useEffect(() => {
     const fetchUserInterviews = async () => {
       if (!user) return;
@@ -47,83 +63,150 @@ export default function Dashboard() {
   }, [user]);
 
   const handleLogout = async () => {
-    await signOut(auth);
-    router.push("/");
+    try {
+      await signOut(auth);
+      Cookies.remove("session"); // CRITICAL for your middleware!
+      window.location.href = "/"; 
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
   };
 
-  if (loading || !user) return <div className="p-10 text-center">Loading...</div>;
+  if (loading || !user) {
+    return (
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-black text-white">
+        <Loader2 className="h-8 w-8 animate-spin text-zinc-500 mb-4" />
+        <p className="text-zinc-500 animate-pulse">Initializing Dashboard...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b px-8 py-4 flex justify-between items-center sticky top-0 z-10">
-        <h1 className="text-2xl font-black text-indigo-600 tracking-tighter">MockWise</h1>
-        <div className="flex items-center gap-4">
-          <span className="text-sm font-medium text-gray-600 hidden md:block">{user.email}</span>
-          <button 
-            onClick={handleLogout}
-            className="text-sm font-bold text-red-500 hover:bg-red-50 px-4 py-2 rounded-lg transition"
-          >
-            Sign Out
-          </button>
+    <div className="min-h-screen bg-black text-zinc-100">
+      {/* Premium Navbar */}
+      <header className="border-b border-zinc-800 bg-black/50 backdrop-blur-md sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
+              <div className="w-4 h-4 bg-black rotate-45" />
+            </div>
+            <h1 className="text-xl font-bold tracking-tighter text-white">MockWise</h1>
+          </div>
+          
+          <div className="flex items-center gap-6">
+            <div className="hidden md:flex items-center gap-2 text-zinc-400 text-sm border-r border-zinc-800 pr-6">
+              <User size={14} />
+              {user.email}
+            </div>
+            <Button 
+              variant="ghost" 
+              onClick={handleLogout}
+              className="text-zinc-400 hover:text-red-400 hover:bg-red-500/10 gap-2 transition-all"
+            >
+              <LogOut size={16} />
+              <span>Sign Out</span>
+            </Button>
+          </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto p-6 md:p-12 space-y-12">
-        {/* Call to Action Section */}
-        <section className="bg-indigo-600 rounded-[2rem] p-8 md:p-12 text-white shadow-2xl shadow-indigo-200 relative overflow-hidden">
-          <div className="relative z-10 max-w-lg">
-            <h2 className="text-4xl font-bold mb-4">Start a new Mock Interview</h2>
-            <p className="text-indigo-100 mb-8">Practice with our AI and get a detailed score report in minutes.</p>
-            <button 
-              onClick={() => router.push("/interview")}
-              className="bg-white text-indigo-600 px-8 py-4 rounded-2xl font-black hover:scale-105 transition-transform"
-            >
-              + GO TO INTERVIEW ROOM
-            </button>
+      <main className="max-w-7xl mx-auto p-6 md:p-10 space-y-10">
+        
+        {/* Modern Hero CTA */}
+        <section className="relative group overflow-hidden rounded-[2.5rem] border border-zinc-800 bg-gradient-to-br from-zinc-900 to-black p-8 md:p-16">
+          <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+            <TrendingUp size={200} />
           </div>
-          <div className="absolute top-[-20%] right-[-10%] w-64 h-64 bg-indigo-500 rounded-full opacity-20 blur-3xl"></div>
+          
+          <div className="relative z-10 max-w-2xl">
+            <Badge className="mb-4 bg-white text-black hover:bg-zinc-200 py-1 px-4">AI-Powered Analysis</Badge>
+            <h2 className="text-4xl md:text-6xl font-bold mb-6 tracking-tight text-white leading-tight">
+              Ready to land your <br /> 
+              <span className="text-zinc-500 italic font-serif">dream job?</span>
+            </h2>
+            <p className="text-zinc-400 text-lg mb-10 max-w-md">
+              Start a realistic mock interview. Get instant feedback on your tone, technical skills, and confidence.
+            </p>
+            <Button 
+              size="lg"
+              onClick={() => router.push("/interview")}
+              className="bg-white text-black hover:bg-zinc-200 rounded-full px-8 py-6 text-md font-bold transition-transform active:scale-95"
+            >
+              <PlusCircle className="mr-2 h-5 w-5" /> START NEW INTERVIEW
+            </Button>
+          </div>
         </section>
 
-        {/* User Interview List */}
+        {/* History Grid */}
         <section>
-          <h3 className="text-2xl font-bold mb-6 text-gray-800">Your Recent Activity</h3>
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-zinc-900 rounded-lg border border-zinc-800">
+                <History size={20} className="text-zinc-400" />
+              </div>
+              <h3 className="text-2xl font-bold text-white tracking-tight">Recent Sessions</h3>
+            </div>
+          </div>
+
           {fetching ? (
-            <p className="text-gray-400">Loading your sessions...</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-48 rounded-2xl bg-zinc-900/50 animate-pulse border border-zinc-800" />
+              ))}
+            </div>
           ) : interviews.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {interviews.map((interview) => (
-                <div key={interview.id} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition">
-                  <div className="flex justify-between items-start mb-4">
-                    <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-xs font-bold uppercase">
+                <Card key={interview.id} className="bg-zinc-950 border-zinc-800 hover:border-zinc-700 transition-all group overflow-hidden">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <Badge variant="outline" className="border-zinc-700 text-zinc-400 font-mono text-[10px] uppercase">
                       {interview.role || "General"}
-                    </span>
-                    <span className="text-2xl font-black text-gray-800">{interview.score}<span className="text-xs text-gray-400">/100</span></span>
-                  </div>
-                  <p className="text-gray-500 text-sm line-clamp-2 mb-4">{interview.feedback || "No feedback generated yet."}</p>
-                  <Link href={`/dashboard/analysis/${interview.id}`} className="block mb-2">
-                    <button className="w-full py-3 rounded-xl border border-gray-200 font-bold text-sm text-gray-700 hover:bg-gray-50">
-                      View Full Analysis
-                    </button>
-                  </Link>
-                </div>
+                    </Badge>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-bold text-white">{interview.score}</span>
+                      <span className="text-[10px] text-zinc-500">/100</span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-4">
+                    <p className="text-zinc-400 text-sm line-clamp-3 italic leading-relaxed">
+                      "{interview.feedback || "Processing AI insights..."}"
+                    </p>
+                  </CardContent>
+                  <CardFooter className="pt-2">
+                    <Link href={`/dashboard/analysis/${interview.id}`} className="w-full">
+                      <Button variant="secondary" className="w-full justify-between bg-zinc-900 text-zinc-300 hover:bg-zinc-800 border-zinc-800">
+                        Detailed Analysis
+                        <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                      </Button>
+                    </Link>
+                  </CardFooter>
+                </Card>
               ))}
             </div>
           ) : (
-            <div className="bg-white border-2 border-dashed border-gray-200 rounded-3xl p-12 text-center">
-              <p className="text-gray-400 mb-4">You haven't completed any interviews yet.</p>
-              <button onClick={() => router.push("/interview")} className="text-indigo-600 font-bold">Start your first one now →</button>
+            <div className="border border-dashed border-zinc-800 rounded-[2rem] py-20 text-center bg-zinc-950/50">
+              <Trophy className="mx-auto h-12 w-12 text-zinc-700 mb-4" />
+              <p className="text-zinc-500 mb-6">Your history is looking a bit empty.</p>
+              <Button variant="outline" onClick={() => router.push("/interview")} className="border-zinc-700 text-zinc-400">
+                Record your first session
+              </Button>
             </div>
           )}
         </section>
 
-        {/* Community Section */}
-        <section className="border-t pt-12">
-          <h3 className="text-2xl font-bold mb-2 text-gray-800">Community Spotlight</h3>
-          <p className="text-gray-500 mb-8">See how other candidates are scoring across different industries.</p>
-          <div className="bg-white rounded-3xl p-8 border border-gray-100 flex items-center justify-center italic text-gray-400">
-            Community leaderboards coming soon!
-          </div>
+        {/* Status Section */}
+        <section className="pt-6 border-t border-zinc-900">
+          <Card className="bg-zinc-900/30 border-zinc-900">
+            <CardContent className="flex flex-col md:flex-row items-center justify-between p-8">
+              <div className="text-center md:text-left mb-4 md:mb-0">
+                <h4 className="text-lg font-semibold text-white">Community Insights</h4>
+                <p className="text-sm text-zinc-500">Benchmark your progress against thousands of candidates.</p>
+              </div>
+              <Badge variant="secondary" className="bg-zinc-800 text-zinc-400 border-zinc-700 px-4 py-1">
+                Coming Q1 2026
+              </Badge>
+            </CardContent>
+          </Card>
         </section>
       </main>
     </div>
