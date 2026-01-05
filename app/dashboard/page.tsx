@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { signOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
+import Link from "next/link";
 
 export default function Dashboard() {
   const { user, loading } = useAuth();
@@ -100,9 +101,11 @@ export default function Dashboard() {
                     <span className="text-2xl font-black text-gray-800">{interview.score}<span className="text-xs text-gray-400">/100</span></span>
                   </div>
                   <p className="text-gray-500 text-sm line-clamp-2 mb-4">{interview.feedback || "No feedback generated yet."}</p>
-                  <button className="w-full py-3 rounded-xl border border-gray-200 font-bold text-sm text-gray-700 hover:bg-gray-50">
-                    View Full Analysis
-                  </button>
+                  <Link href={`/dashboard/analysis/${interview.id}`} className="block mb-2">
+                    <button className="w-full py-3 rounded-xl border border-gray-200 font-bold text-sm text-gray-700 hover:bg-gray-50">
+                      View Full Analysis
+                    </button>
+                  </Link>
                 </div>
               ))}
             </div>
