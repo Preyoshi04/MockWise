@@ -39,7 +39,7 @@ export default function LandingPage() {
               </Link>
               <Link href="/auth/register">
                 <Button className="bg-white text-black hover:bg-zinc-200 rounded-full px-6 font-bold">
-                  Get Started
+                  Sign Up
                 </Button>
               </Link>
             </>
