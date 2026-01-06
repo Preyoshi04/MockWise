@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
@@ -12,18 +13,21 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { LogOut, PlusCircle, History, Trophy, ChevronRight, User, Loader2, Globe, Zap } from "lucide-react";
+import { LogOut, PlusCircle, History, Trophy, ChevronRight, User, Loader2, Globe, Zap, SparklesIcon } from "lucide-react";
 import Image from "next/image";
 
 export default function Dashboard() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const { userData, loadingg } = useUser();
+  const { userData } = useUser();
   const [interviews, setInterviews] = useState<any[]>([]);
   const [fetching, setFetching] = useState(true);
-  const [communityStats, setCommunityStats] = useState({ avgScore: 0, topStack: "Next.js" });
+  const [communityStats, setCommunityStats] = useState({ 
+    avgScore: 0, 
+    topStack: "Next.js",
+    globalScores: [] as number[] 
+  });
 
-  // 1. Improved Redirect Logic
   useEffect(() => {
     if (!loading && !user) {
       router.replace("/auth/login");
@@ -37,16 +41,22 @@ export default function Dashboard() {
       try {
         const q = query(collection(db, "interviews"), where("userId", "==", user.uid), orderBy("createdAt", "desc"));
         const querySnapshot = await getDocs(q);
-        setInterviews(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const userDocs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setInterviews(userDocs);
 
-        const cq = query(collection(db, "interviews"), limit(50));
+        // Fetch Global Benchmarks (Synced with Community Page: 200 limit)
+        const cq = query(collection(db, "interviews"), orderBy("createdAt", "desc"), limit(200));
         const cSnapshot = await getDocs(cq);
         const cDocs = cSnapshot.docs.map(d => d.data());
+
         if (cDocs.length > 0) {
-          const total = cDocs.reduce((acc, curr: any) => acc + (Number(curr.score) || 0), 0);
+          const scores = cDocs.map((d: any) => Number(d.score) || 0);
+          const total = scores.reduce((acc, curr) => acc + curr, 0);
+          
           setCommunityStats({
             avgScore: Math.round(total / cDocs.length),
             topStack: (cDocs[0] as any).techStack || "Next.js",
+            globalScores: scores
           });
         }
       } catch (err: any) {
@@ -55,17 +65,61 @@ export default function Dashboard() {
         setFetching(false);
       }
     };
-    fetchData();
-  }, [user]);
+    if (!loading && user) fetchData();
+  }, [user, loading]);
 
-  // 2. "Clean Slate" Logout
+  // --- SYNCED PERCENTILE LOGIC ---
+const standing = (() => {
+  // 1. Check if user has any data at all
+  if (!interviews || interviews.length === 0) {
+    return { 
+      label: "Not Ranked", 
+      value: 0, 
+      sub: "Complete a session to see rank" 
+    };
+  }
+
+  // 2. Calculate User's Average Score
+  const userAvg = interviews.reduce((acc, curr) => acc + (Number(curr.score) || 0), 0) / interviews.length;
+
+  // 3. Handle the "0 Score" case (Prevents awkward "Top 100%" display)
+  if (userAvg === 0) {
+    return { 
+      label: "Unranked", 
+      value: 0, 
+      sub: "Score above 0 to enter the leaderboards." 
+    };
+  }
+
+  // 4. Calculate Percentile
+  // Count how many people in the global pool (last 200) have a score LOWER than the user average
+  const peopleBeaten = communityStats.globalScores.filter(score => score < userAvg).length;
+  
+  // Use the exact same global pool size as the community page for the denominator
+  const totalGlobal = communityStats.globalScores.length || 1;
+  
+  // Percentile is (Beaten / Total) * 100
+  const percentile = Math.round((peopleBeaten / totalGlobal) * 100);
+  
+  // Top % is the Inverse (e.g., 90th percentile = Top 10%)
+  // Math.max(1, ...) ensures even the best user sees "Top 1%" instead of "Top 0%"
+  const topPercent = Math.max(1, 100 - percentile);
+
+  return {
+    label: `Top ${topPercent}%`,
+    value: percentile, // Used for the Progress bar width
+    sub: `Outperforming ${percentile}% of the community.`
+  };
+})();
+
   const handleLogout = async () => {
     try {
       await signOut(auth);
       Cookies.remove("session");
+      Cookies.remove("uid"); // Clear both
       localStorage.clear();
       sessionStorage.clear();
-      window.location.href = "/"; // Force refresh to clear all states
+      window.location.href = "/";
     } catch (error) {
       console.error("Error signing out:", error);
     }
@@ -85,18 +139,16 @@ export default function Dashboard() {
       <header className="border-b border-zinc-800 bg-black/50 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
-              <div className="w-4 h-4 bg-black rotate-45" />
-            </div>
-            <h1 className="text-xl font-bold tracking-tighter text-white">MockWise</h1>
+            <SparklesIcon size={30} />
+            <h1 className="text-4xl font-bold tracking-tighter italic">MockWise</h1>
           </div>
 
           <div className="flex items-center gap-6">
-            <div className="hidden md:flex items-center gap-2 text-zinc-400 text-sm border-r border-zinc-800 pr-6">
-              <User size={14} />
-              <span className="font-medium text-zinc-200">
-                {userData?.name || "Developer"}
-              </span>
+            <div className="flex items-center gap-2 text-zinc-400 text-sm border-r border-zinc-800 pr-3 md:pr-6">
+              <div className="w-6 h-6 rounded-full bg-zinc-900 flex items-center justify-center border border-zinc-800">
+                <User size={12} className="text-zinc-200" />
+              </div>
+              <span className="font-medium text-zinc-200">{userData?.name || "Dev"}</span>
             </div>
             <Button variant="ghost" onClick={handleLogout} className="text-zinc-400 hover:text-red-400 hover:bg-red-500/10 gap-2 transition-all">
               <LogOut size={16} />
@@ -114,28 +166,22 @@ export default function Dashboard() {
               Ready to land your <br />
               <span className="text-zinc-500 italic font-serif">dream job?</span>
             </h2>
-            <p className="text-zinc-400 text-lg mb-10 max-w-md">
-              Start a realistic mock interview. Get instant feedback on your tone, technical skills, and confidence.
-            </p>
             <Button size="lg" onClick={() => router.push("/interview")} className="bg-white text-black hover:bg-zinc-200 rounded-full px-8 py-6 text-md font-bold transition-transform active:scale-95">
               <PlusCircle className="mr-2 h-5 w-5" /> START NEW INTERVIEW
             </Button>
           </div>
-
           <div className="relative shrink-0 w-full md:w-1/3 max-w-[300px]">
-            <div className="absolute inset-0 bg-indigo-500/10 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 rounded-2xl" />
             <Image src="/robot.jpeg" alt="Robot" width={500} height={500} className="rounded-2xl border border-zinc-800 object-cover shadow-2xl" />
           </div>
         </section>
 
-        {/* RECENT SESSIONS SECTION */}
         <section>
-           <div className="flex items-center gap-3 mb-8">
-              <div className="p-2 bg-zinc-900 rounded-lg border border-zinc-800">
-                <History size={20} className="text-zinc-400" />
-              </div>
-              <h3 className="text-2xl font-bold text-white tracking-tight">Recent Sessions</h3>
+          <div className="flex items-center gap-3 mb-8">
+            <div className="p-2 bg-zinc-900 rounded-lg border border-zinc-800">
+              <History size={20} className="text-zinc-400" />
             </div>
+            <h3 className="text-2xl font-bold text-white tracking-tight">Recent Sessions</h3>
+          </div>
 
           {fetching ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -144,21 +190,21 @@ export default function Dashboard() {
           ) : interviews.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {interviews.map((interview) => (
-                <Card key={interview.id} className="bg-zinc-950 border-zinc-800 hover:border-zinc-700 transition-all group overflow-hidden">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <Badge variant="outline" className="border-zinc-700 text-zinc-400 font-mono text-[10px] uppercase">{interview.role || "General"}</Badge>
+                <Card key={interview.id} className="bg-zinc-950 border-zinc-800 hover:border-zinc-700 transition-all group">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <Badge variant="outline" className="border-zinc-700 text-zinc-400 text-[10px]">{interview.techStack || "General"}</Badge>
                     <div className="flex items-baseline gap-1">
                       <span className="text-2xl font-bold text-white">{interview.score}</span>
                       <span className="text-[10px] text-zinc-500">/100</span>
                     </div>
                   </CardHeader>
-                  <CardContent className="pt-4">
+                  <CardContent>
                     <p className="text-zinc-400 text-sm line-clamp-3 italic leading-relaxed">&quot;{interview.feedback || "Processing AI insights..."}&quot;</p>
                   </CardContent>
-                  <CardFooter className="pt-2">
+                  <CardFooter>
                     <Link href={`/dashboard/analysis/${interview.id}`} className="w-full">
-                      <Button variant="secondary" className="w-full justify-between bg-zinc-900 text-zinc-300 hover:bg-zinc-800 border-zinc-800">
-                        Detailed Analysis <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                      <Button variant="secondary" className="w-full justify-between bg-zinc-900 text-zinc-300 border-zinc-800">
+                        Detailed Analysis <ChevronRight size={14} />
                       </Button>
                     </Link>
                   </CardFooter>
@@ -174,7 +220,6 @@ export default function Dashboard() {
           )}
         </section>
 
-        {/* COMMUNITY INSIGHTS SECTION */}
         <section className="pt-6 border-t border-zinc-900">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card className="lg:col-span-2 bg-zinc-950 border-zinc-800 p-8 flex flex-col md:flex-row items-center justify-between gap-6">
@@ -196,11 +241,12 @@ export default function Dashboard() {
                 <Button className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-6">Explore Network <ChevronRight size={16} /></Button>
               </Link>
             </Card>
-            <Card className="bg-zinc-950 border-zinc-800 p-8 flex flex-col justify-center">
-              <p className="text-indigo-400 text-xs font-bold uppercase mb-2">Your Percentile</p>
-              <h2 className="text-4xl font-black text-white mb-4">Top 12%</h2>
-              <Progress value={88} className="h-1 bg-zinc-900" />
-              <p className="text-zinc-600 text-[10px] mt-4 italic">Based on your last 3 technical sessions.</p>
+
+            <Card className={`border-zinc-800 p-8 flex flex-col justify-center transition-colors ${interviews.length > 0 ? 'bg-zinc-950' : 'bg-zinc-900/30'}`}>
+              <p className="text-indigo-400 text-xs font-bold uppercase mb-2">Your Standing</p>
+              <h2 className="text-4xl font-black text-white mb-4">{standing.label}</h2>
+              <Progress value={standing.value} className="h-1 bg-zinc-900" />
+              <p className="text-zinc-600 text-[10px] mt-4 italic">{standing.sub}</p>
             </Card>
           </div>
         </section>

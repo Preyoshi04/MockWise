@@ -2,245 +2,208 @@
 "use client";
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
-import { collection, query, getDocs, limit, orderBy } from "firebase/firestore";
+import { collection, query, getDocs, limit, orderBy, where } from "firebase/firestore";
+import { useRouter } from "next/navigation";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Users, TrendingUp, Zap, Globe, MessageSquare, BarChart3 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Globe, BarChart3, ExternalLink, Newspaper, Loader2, ArrowLeft } from "lucide-react";
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import Cookies from "js-cookie";
 
 export default function CommunityInsights() {
+    const router = useRouter(); 
     const [stats, setStats] = useState({
         avgScore: 0,
+        userAvgScore: 0,
+        userSessionCount: 0,
         totalInterviews: 0,
         topStack: "Next.js",
-        scoreDistribution: [0, 0, 0, 0, 0],
+        scoreDistribution: [] as { range: string; count: number }[],
         skillHeatmap: [] as { name: string; count: number }[],
-        recentActivity: [] as any[]
+        recentActivity: [] as any[],
+        globalScores: [] as number[] 
     });
 
-const [trendingNews, setTrendingNews] = useState<any[]>([]);
+    const [trendingNews, setTrendingNews] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
 
-useEffect(() => {
-    const fetchCommunityStats = async () => {
-        try {
-            const q = query(
-                collection(db, "interviews"),
-                orderBy("createdAt", "desc"),
-                limit(100)
-            );
-            const snapshot = await getDocs(q);
-            const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-
-            if (docs.length > 0) {
-                const scores = docs.map(d => Number((d as any).score) || 0);
-                const totalScore = scores.reduce((acc, curr) => acc + curr, 0);
-                const realAvg = Math.round(totalScore / docs.length);
-
-                const distribution = [0, 0, 0, 0, 0];
-                scores.forEach(s => {
-                    const index = Math.min(Math.floor(s / 20), 4);
-                    distribution[index]++;
-                });
-
-                const stacks: Record<string, number> = {};
-                docs.forEach((doc: any) => {
-                    const stack = doc.techStack || "General";
-                    stacks[stack] = (stacks[stack] || 0) + 1;
-                });
-
-                const heatmap = Object.entries(stacks)
-                    .map(([name, count]) => ({ name, count }))
-                    .sort((a, b) => b.count - a.count)
-                    .slice(0, 6);
-
-                setStats({
-                    avgScore: realAvg,
-                    totalInterviews: docs.length,
-                    topStack: heatmap[0]?.name || "Next.js",
-                    scoreDistribution: distribution,
-                    skillHeatmap: heatmap,
-                    recentActivity: docs.slice(0, 5) 
-                });
-            }
-        } catch (error) {
-            console.error("Error fetching community stats:", error);
-        }
+    const formatTimeAgo = (dateString: string) => {
+        const seconds = Math.floor((new Date().getTime() - new Date(dateString).getTime()) / 1000);
+        let interval = seconds / 3600;
+        if (interval > 24) return Math.floor(interval / 24) + "d ago";
+        if (interval >= 1) return Math.floor(interval) + "h ago";
+        interval = seconds / 60;
+        return Math.floor(interval) + "m ago";
     };
 
-    const fetchLatestNews = async () => {
-    try {
-        // We add 'query=software+ai+dev' to filter for technical topics
-        // 'tags=story' ensures we only get articles, not comments
-        const response = await fetch(
-            "https://hn.algolia.com/api/v1/search_by_date?tags=story&query=software+ai+coding+system&hitsPerPage=3"
-        );
+    useEffect(() => {
+        const fetchAllData = async () => {
+            try {
+                const userId = Cookies.get("uid");
+                
+                const qGlobal = query(collection(db, "interviews"), orderBy("createdAt", "desc"), limit(200));
+                const globalSnapshot = await getDocs(qGlobal);
+                const globalDocs = globalSnapshot.docs.map(d => ({ ...d.data() } as any));
+                const globalScores = globalDocs.map(d => Number(d.score) || 0);
 
-        if (!response.ok) throw new Error("API Limit reached or network error");
+                let userScores: number[] = [];
+                if (userId) {
+                    const qUser = query(collection(db, "interviews"), where("userId", "==", userId));
+                    const userSnapshot = await getDocs(qUser);
+                    userScores = userSnapshot.docs.map(d => Number(d.data().score) || 0);
+                }
 
-        const data = await response.json();
-        
-        if (data.hits && Array.isArray(data.hits)) {
-            const formattedNews = data.hits.map((story: any) => ({
-                id: story.objectID,
-                title: story.title,
-                url: story.url || `https://news.ycombinator.com/item?id=${story.objectID}`,
-                score: story.points || 0,
-                by: story.author
-            }));
-            
-            setTrendingNews(formattedNews);
-        }
-    } catch (error) {
-        console.error("Filtered Tech Fetch Error:", error);
-    }
-};
+                const newsResponse = await fetch("https://hn.algolia.com/api/v1/search_by_date?tags=story&query=software+ai+coding+system&hitsPerPage=5");
+                if (newsResponse.ok) {
+                    const newsData = await newsResponse.json();
+                    setTrendingNews(newsData.hits.map((story: any) => ({
+                        id: story.objectID,
+                        title: story.title,
+                        url: story.url || `https://news.ycombinator.com/item?id=${story.objectID}`,
+                        tag: story.author ? `@${story.author}` : "Tech",
+                        time: formatTimeAgo(story.created_at)
+                    })));
+                }
 
-    fetchCommunityStats();
-    fetchLatestNews();
-}, []);
+                if (globalDocs.length > 0) {
+                    const realAvg = Math.round(globalScores.reduce((a, b) => a + b, 0) / globalScores.length);
+                    const userAvg = userScores.length > 0 ? Math.round(userScores.reduce((a, b) => a + b, 0) / userScores.length) : 0;
+
+                    const distData = [
+                        { range: "0-20", count: 0 }, { range: "20-40", count: 0 },
+                        { range: "40-60", count: 0 }, { range: "60-80", count: 0 },
+                        { range: "80-100", count: 0 },
+                    ];
+                    globalScores.forEach(s => {
+                        const index = Math.min(Math.floor(s / 20.01), 4);
+                        distData[index].count++;
+                    });
+
+                    const stacks: Record<string, number> = {};
+                    globalDocs.forEach((doc: any) => {
+                        const stack = doc.techStack || "General";
+                        stacks[stack] = (stacks[stack] || 0) + 1;
+                    });
+                    const heatmap = Object.entries(stacks)
+                        .map(([name, count]) => ({ name, count }))
+                        .sort((a, b) => b.count - a.count).slice(0, 6);
+
+                    setStats({
+                        avgScore: realAvg,
+                        userAvgScore: userAvg,
+                        userSessionCount: userScores.length,
+                        totalInterviews: globalDocs.length,
+                        topStack: heatmap[0]?.name || "Next.js",
+                        scoreDistribution: distData,
+                        skillHeatmap: heatmap,
+                        recentActivity: globalDocs.slice(0, 5),
+                        globalScores: globalScores
+                    });
+                }
+            } catch (error) {
+                console.error("Data fetch error:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchAllData();
+    }, []);
+
+    if (loading) return (
+        <div className="min-h-screen bg-black flex items-center justify-center">
+            <Loader2 className="animate-spin text-indigo-500" size={40} />
+        </div>
+    );
 
     return (
         <div className="p-6 md:p-10 bg-black min-h-screen text-white">
             <div className="max-w-7xl mx-auto">
-                <div className="mb-10 text-center md:text-left">
-                    <h1 className="text-4xl font-black tracking-tight mb-2">Community Insights</h1>
-                    <p className="text-zinc-500">How the MockWise network is performing globally.</p>
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
+                    <div>
+                        <h1 className="text-4xl font-black tracking-tight mb-2">Community Insights</h1>
+                        <p className="text-zinc-500">Real-time performance benchmarks and tech trends.</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <Badge variant="outline" className="hidden sm:flex border-zinc-800 text-zinc-400 gap-2 px-3 py-1 mr-2">
+                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" /> Live Stats
+                        </Badge>
+                        <Button onClick={() => router.push("/dashboard")} variant="outline" className="bg-zinc-950 border-zinc-800 hover:bg-zinc-900 text-zinc-300 hover:text-white rounded-xl gap-2 cursor-pointer">
+                            <ArrowLeft size={16} /> Dashboard
+                        </Button>
+                    </div>
                 </div>
 
-                {/* Top Row: High-Level Stats & Percentile */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-                    <Card className="bg-zinc-950 border-zinc-800 p-6 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-4 opacity-10"><Globe size={80} /></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+                    <Card className="bg-zinc-950 border-zinc-800 p-6">
                         <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-2">Global Avg Score</p>
                         <h2 className="text-4xl font-black text-indigo-500">{stats.avgScore}%</h2>
-                        <Progress value={stats.avgScore} className="h-1 mt-4 bg-zinc-900" />
+                        <Progress value={stats.avgScore} className="h-4 mt-4" />
                     </Card>
-
                     <Card className="bg-zinc-950 border-zinc-800 p-6">
-                        <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-2">Most Practiced</p>
-                        <h2 className="text-2xl font-bold flex items-center gap-2">
-                            <Zap className="text-yellow-500" size={20} /> {stats.topStack}
-                        </h2>
-                        <p className="text-zinc-600 text-sm mt-2">Leading community trend</p>
-                    </Card>
-
-                    <Card className="bg-indigo-600 border-none p-6 text-white shadow-[0_0_30px_rgba(79,70,229,0.3)]">
-                        <p className="text-indigo-200 text-xs font-bold uppercase tracking-widest mb-2">Community Standing</p>
-                        <h2 className="text-3xl font-black">Top 15%</h2>
-                        <p className="text-indigo-100 text-sm mt-2 opacity-80">You are outperforming the majority of applicants.</p>
+                        <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-2">Your Average</p>
+                        <h2 className="text-2xl font-bold">{stats.userSessionCount > 0 ? `${stats.userAvgScore}%` : "--"}</h2>
+                        <p className="text-zinc-600 text-sm mt-2">{stats.userSessionCount} sessions recorded</p>
                     </Card>
                 </div>
 
-                {/* Second Row: Distribution & Heatmap */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
-                    <Card className="lg:col-span-2 bg-zinc-950 border-zinc-800 p-6">
-                        <div className="flex items-center gap-2 mb-6 text-zinc-400">
-                            <BarChart3 size={18} />
-                            <CardTitle className="text-sm font-medium uppercase">Global Score Distribution</CardTitle>
-                        </div>
-                        <div className="flex items-end gap-3 h-40">
-                            {stats.scoreDistribution.map((count, i) => (
-                                <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
-                                    <div 
-                                        className="w-full bg-indigo-500/20 border-t-2 border-indigo-500 rounded-t-sm transition-all duration-700 ease-out group-hover:bg-indigo-500/40" 
-                                        style={{ height: `${stats.totalInterviews > 0 ? (count / stats.totalInterviews) * 100 : 0}%` }}
-                                    />
-                                    <span className="text-[10px] text-zinc-600 font-bold">{i * 20}-{i * 20 + 20}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </Card>
-
-                    <Card className="bg-zinc-950 border-zinc-800 p-6">
-                         <CardTitle className="text-sm font-medium text-zinc-500 uppercase mb-6">Skill Heatmap</CardTitle>
-                         <div className="flex flex-col gap-3">
-                            {stats.skillHeatmap.map((skill) => (
-                                <div key={skill.name} className="flex items-center justify-between">
-                                    <span className="text-sm text-zinc-300">{skill.name}</span>
-                                    <div className="flex items-center gap-2">
-                                        <div className="h-1.5 w-24 bg-zinc-900 rounded-full overflow-hidden">
-                                            <div 
-                                                className="h-full bg-indigo-500" 
-                                                style={{ width: `${(skill.count / (stats.skillHeatmap[0]?.count || 1)) * 100}%` }}
-                                            />
-                                        </div>
-                                        <span className="text-xs text-zinc-500">{skill.count}</span>
-                                    </div>
-                                </div>
-                            ))}
-                         </div>
-                    </Card>
-                </div>
-
-                {/* Third Row: Activity & Dynamic News */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                    <section>
-                        <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-                            <TrendingUp className="text-indigo-400" size={18} /> Live Activity Feed
-                        </h3>
-                        <div className="space-y-4">
-                            {stats.recentActivity.map((activity, idx) => (
-                                <div key={idx} className="flex items-center justify-between p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/50 hover:bg-zinc-900 transition-colors">
-                                    <div className="flex items-center gap-4">
-                                        <div className="h-10 w-10 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-400 font-bold text-sm">
-                                            {activity.role?.[0] || "T"}
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-medium">{activity.role || "Technical Interview"}</p>
-                                            <p className="text-xs text-zinc-500">{activity.techStack || "General"}</p>
-                                        </div>
-                                    </div>
-                                    <Badge variant="outline" className="text-emerald-400 border-emerald-500/20 bg-emerald-500/5">
-                                        {activity.score || 0}%
-                                    </Badge>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
-
-                    <section className="bg-indigo-600/5 rounded-3xl p-8 border border-indigo-500/10 flex flex-col">
-                        <div className="flex items-center gap-2 mb-6 text-indigo-400">
-                            <Globe size={20} className="animate-pulse" />
-                            <h3 className="text-xl font-bold text-white">Latest Tech Feed</h3>
-                        </div>
-                        
-                        <div className="space-y-6 flex-grow">
-                            {trendingNews.length > 0 ? (
-                                trendingNews.map((story) => (
-                                    <div key={story.id} className="group">
-                                        <a 
-                                            href={story.url || `https://news.ycombinator.com/item?id=${story.id}`} 
-                                            target="_blank" 
-                                            rel="noopener noreferrer"
-                                            className="block"
-                                        >
-                                            <p className="text-zinc-300 font-medium group-hover:text-white group-hover:underline transition-colors line-clamp-2">
-                                                {story.title}
-                                            </p>
-                                            <div className="flex items-center gap-3 mt-2">
-                                                <Badge variant="secondary" className="bg-zinc-900 text-[10px] text-zinc-500 border-zinc-800">
-                                                    {story.score || 0} pts
-                                                </Badge>
-                                                <span className="text-[10px] text-zinc-600">
-                                                    by {story.by}
-                                                </span>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2 space-y-6">
+                        <Card className="bg-zinc-950 border-zinc-800 p-6">
+                            <div className="flex items-center gap-2 mb-6 text-zinc-400">
+                                <BarChart3 size={18} />
+                                <CardTitle className="text-sm font-medium uppercase">Score Distribution</CardTitle>
+                            </div>
+                            <div className="h-64 w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={stats.scoreDistribution}>
+                                        <XAxis dataKey="range" axisLine={false} tickLine={false} tick={{ fill: '#52525b', fontSize: 10 }} />
+                                        <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                                            {stats.scoreDistribution.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={entry.count > 0 ? '#6366f1' : '#18181b'} />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </Card>
+                        <Card className="bg-zinc-950 border-zinc-800 p-6">
+                             <CardTitle className="text-sm font-medium text-zinc-500 uppercase mb-6 flex items-center gap-2"><Globe size={16} /> Recent Global Activity</CardTitle>
+                             <div className="space-y-4">
+                                {stats.recentActivity.map((activity, i) => (
+                                    <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-500 font-bold text-xs uppercase">{activity.techStack?.[0] || 'D'}</div>
+                                            <div>
+                                                <p className="text-sm font-medium text-zinc-200">{activity.techStack || 'Dev'} Interview</p>
+                                                <p className="text-xs text-zinc-500">Score: {activity.score}%</p>
                                             </div>
-                                        </a>
+                                        </div>
+                                        <Badge variant="secondary" className="bg-zinc-800 text-zinc-400 text-[10px] uppercase">
+                                            {activity.createdAt?.seconds ? new Date(activity.createdAt.seconds * 1000).toLocaleDateString() : "Just now"}
+                                        </Badge>
                                     </div>
-                                ))
-                            ) : (
-                                <p className="text-zinc-500 text-sm italic">Gathering community news...</p>
-                            )}
-                        </div>
+                                ))}
+                             </div>
+                        </Card>
+                    </div>
 
-                        <div className="mt-8 pt-8 border-t border-indigo-500/10">
-                            <MessageSquare className="text-indigo-500 mb-2" size={18} />
-                            <p className="text-sm font-bold uppercase tracking-widest text-indigo-400">Pro Tip</p>
-                            <p className="text-zinc-400 text-sm italic mt-1">
-                                &quot;Explain your trade-offs clearly to boost your score above 85%.&quot;
-                            </p>
-                        </div>
-                    </section>
+                    <div className="space-y-6">
+                        <Card className="bg-zinc-950 border-zinc-800 p-6 border-t-indigo-500/50 border-t-2">
+                            <CardTitle className="text-sm font-medium text-zinc-200 uppercase mb-6 flex items-center gap-2"><Newspaper size={16} className="text-indigo-500" /> Trending Tech</CardTitle>
+                            <div className="space-y-5">
+                                {trendingNews.map((news) => (
+                                    <a key={news.id} href={news.url} target="_blank" rel="noopener noreferrer" className="block group cursor-pointer">
+                                        <Badge className="mb-2 bg-zinc-900 text-indigo-400 group-hover:bg-indigo-500/10 border-none text-[10px] transition-colors">{news.tag}</Badge>
+                                        <h3 className="text-sm font-semibold text-zinc-300 group-hover:text-indigo-400 transition-colors leading-snug">{news.title}</h3>
+                                        <p className="text-[10px] text-zinc-600 mt-1 uppercase tracking-tighter">{news.time}</p>
+                                    </a>
+                                ))}
+                            </div>
+                        </Card>
+                    </div>
                 </div>
             </div>
         </div>
