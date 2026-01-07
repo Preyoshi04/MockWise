@@ -6,21 +6,23 @@ import { useAuth } from "@/context/AuthContext";
 import { useUser } from "@/hooks/use-user"; 
 import { useRouter } from "next/navigation";
 import { toast, Toaster } from "sonner";
+import { db } from "@/lib/firebase"; 
+import { doc, updateDoc, increment } from "firebase/firestore";
 
 // Shadcn + Lucide
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
-  Mic, 
-  MicOff, 
-  PhoneOff, 
-  Waves, 
-  ShieldCheck, 
-  CircleDot,
-  ArrowLeft,
-  Video,
-  VideoOff,
-  Loader2
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { 
+  Mic, MicOff, PhoneOff, Waves, ShieldCheck, 
+  CircleDot, ArrowLeft, Video, VideoOff, Loader2, AlertTriangle 
 } from "lucide-react";
 
 const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY || "");
@@ -38,18 +40,18 @@ export default function InterviewPage() {
   const [cameraActive, setCameraActive] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isEnding, setIsEnding] = useState(false);
-  const [wasManipulated, setWasManipulated] = useState(false);
+  
+  // Modal State
+  const [showAbortedModal, setShowAbortedModal] = useState(false);
+  const manipulationRef = useRef(false);
 
   const toggleCamera = async () => {
-    // If user changes camera during a live interview
     if (isCalling) {
-      setWasManipulated(true);
+      manipulationRef.current = true;
       vapi.stop(); 
       
-      toast.error("Interview Cancelled", {
-        description: "You manipulated the camera state. Redirecting to dashboard...",
-        duration: 4000,
-      });
+      // Instead of a toast, show the modal
+      setShowAbortedModal(true);
 
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
@@ -59,50 +61,48 @@ export default function InterviewPage() {
       return;
     }
 
-    // Normal camera toggle logic (Pre-interview)
     if (cameraActive) {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
+      if (stream) stream.getTracks().forEach(track => track.stop());
       setStream(null);
       setCameraActive(false);
     } else {
       try {
         const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
         setStream(mediaStream);
-        if (videoRef.current) {
-          videoRef.current.srcObject = mediaStream;
-        }
+        if (videoRef.current) videoRef.current.srcObject = mediaStream;
         setCameraActive(true);
       } catch (err) {
-        console.error("Camera access denied:", err);
-        toast.error("Camera Error", {
-          description: "Could not access camera. Please check permissions."
-        });
+        toast.error("Camera Error", { description: "Could not access camera." });
       }
     }
   };
 
   useEffect(() => {
-    vapi.on("call-end", () => {
+    vapi.on("call-end", async () => {
       setIsCalling(false);
       setIsAssistantTalking(false);
       setTranscript("");
       setIsEnding(false);
       
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
+      if (stream) stream.getTracks().forEach(track => track.stop());
       
-      // Only show success if it wasn't a camera manipulation
-      if (!wasManipulated) {
-        toast.success("Interview Completed", { description: "Redirecting to your dashboard..." });
+      // If it WAS NOT manipulated, record the session and show success toast
+      if (!manipulationRef.current && user?.uid) {
+        try {
+          const userRef = doc(db, "users", user.uid);
+          await updateDoc(userRef, { totalInterviews: increment(1) });
+          
+          toast.success("Interview Completed", { 
+            description: "Session recorded successfully." 
+          });
+          
+          // Redirect after success toast
+          setTimeout(() => router.push("/dashboard"), 2000);
+        } catch (err) {
+          console.error("DB Update failed:", err);
+        }
       }
-      
-      setTimeout(() => {
-        router.push("/dashboard");
-        setWasManipulated(false);
-      }, 2000);
+      // If it WAS manipulated, we do nothing here because the Modal is already open
     });
 
     vapi.on("speech-start", () => setIsAssistantTalking(true));
@@ -114,44 +114,25 @@ export default function InterviewPage() {
       }
     });
 
-    vapi.on("error", (e) => {
-      console.error("Vapi Error:", e);
-      setIsEnding(false);
-      toast.error("Connection Error", { description: "An error occurred with the AI assistant." });
-    });
-
     return () => { 
       vapi.stop(); 
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
+      if (stream) stream.getTracks().forEach(track => track.stop());
     };
-  }, [router, stream, wasManipulated]); 
+  }, [router, stream, user?.uid]); 
 
   const startInterview = () => {
-    if (!user?.uid) {
-      toast.error("Session Error", { description: "User not authenticated." });
-      return;
-    }
-
-    setWasManipulated(false);
+    if (!user?.uid) return;
+    manipulationRef.current = false;
     setIsCalling(true);
-
-    const firstName = userData?.name?.split(" ")[0] || "there";
     const assistantIdentifier = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID || "";
-
     vapi.start(assistantIdentifier, {
-      firstMessage: `Hello ${firstName}, I am your AI interviewer today. I've reviewed your profile and I'm ready to begin. How are you doing today?`,
-      variableValues: { 
-        userId: user.uid,
-        userName: userData?.name || "Developer" 
-      },
+      firstMessage: `Hello there, I am your AI interviewer. How are you?`,
     });
   };
 
   const endInterview = () => {
     setIsEnding(true);
-    setWasManipulated(false); // Voluntary end
+    manipulationRef.current = false; 
     vapi.stop();
   };
 
@@ -159,24 +140,43 @@ export default function InterviewPage() {
     <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-between p-4 md:p-12 overflow-hidden">
       <Toaster position="top-center" theme="dark" richColors />
 
+      {/* --- ABORTED MODAL --- */}
+      <Dialog open={showAbortedModal} onOpenChange={setShowAbortedModal}>
+        <DialogContent className="bg-zinc-950 border-zinc-800 text-white rounded-[2rem]">
+          <DialogHeader className="flex flex-col items-center gap-4">
+            <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
+              <AlertTriangle className="text-red-500" size={32} />
+            </div>
+            <DialogTitle className="text-2xl font-bold text-center">Interview Terminated</DialogTitle>
+            <DialogDescription className="text-zinc-400 text-center text-base">
+              You manipulated your camera state during the live session. For security and fairness, the interview has been cancelled and will not be recorded.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <Button 
+              onClick={() => router.push("/dashboard")}
+              className="w-full bg-white text-black hover:bg-zinc-200 font-bold h-12 rounded-xl"
+            >
+              Return to Dashboard
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Background Glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] md:w-[600px] h-[300px] md:h-[600px] bg-indigo-500/10 rounded-full blur-[80px] md:blur-[120px] pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] md:w-[600px] h-[300px] md:h-[600px] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none" />
 
       {/* Header Info */}
       <div className="w-full max-w-5xl flex justify-between items-center z-10">
-        <Button 
-          variant="ghost" 
-          onClick={() => router.back()} 
-          className="text-zinc-500 hover:text-white transition-colors h-9 px-2 md:px-4"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" /> <span className="hidden xs:inline">Exit Room</span>
+        <Button variant="ghost" onClick={() => router.back()} className="text-zinc-500 hover:text-white transition-colors h-9">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Exit Room
         </Button>
-        <div className="flex items-center gap-2 md:gap-4">
-          <Badge variant="outline" className="border-zinc-800 text-zinc-500 gap-1.5 px-2 py-0.5 md:px-3 md:py-1 text-[10px] md:text-xs">
+        <div className="flex items-center gap-4">
+          <Badge variant="outline" className="border-zinc-800 text-zinc-500 gap-1.5 px-3 py-1">
             <ShieldCheck size={12} className="text-emerald-500" /> Secure
           </Badge>
           {isCalling && (
-            <Badge className="bg-red-500/10 text-red-500 border-red-500/20 animate-pulse gap-1.5 px-2 py-0.5 md:px-3 md:py-1 text-[10px] md:text-xs">
+            <Badge className="bg-red-500/10 text-red-500 border-red-500/20 animate-pulse gap-1.5 px-3 py-1">
               <CircleDot size={12} /> LIVE
             </Badge>
           )}
@@ -185,81 +185,47 @@ export default function InterviewPage() {
 
       {/* Main Experience */}
       <div className="relative flex flex-col items-center justify-center z-10 w-full max-w-4xl flex-1">
-        <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-12 w-full">
-          
-          {/* Neural Orb Container */}
+        <div className="flex flex-col md:flex-row items-center justify-center gap-12 w-full">
+          {/* AI Orb */}
           <div className="relative">
             {isCalling && (
-              <>
-                <div className={`absolute inset-0 rounded-full border border-indigo-500/50 animate-ping duration-[3000ms] ${isAssistantTalking ? 'opacity-100' : 'opacity-0'}`} />
-                <div className={`absolute inset-0 rounded-full border border-white/20 animate-pulse duration-[2000ms]`} />
-              </>
+              <div className={`absolute inset-0 rounded-full border border-indigo-500/50 animate-ping ${isAssistantTalking ? 'opacity-100' : 'opacity-0'}`} />
             )}
-            
-            <div className={`w-32 h-32 md:w-64 md:h-64 rounded-full border-2 flex flex-col items-center justify-center transition-all duration-700 relative z-20 ${
-              isCalling 
-                ? (isAssistantTalking ? "border-white bg-white/5 scale-105 md:scale-110 shadow-[0_0_80px_rgba(255,255,255,0.1)]" : "border-indigo-500 bg-indigo-500/5 scale-100") 
-                : "border-zinc-800 bg-zinc-900/20"
-            }`}>
-              {isCalling ? (
-                isAssistantTalking ? <Waves className="h-6 w-6 md:h-10 md:w-10 text-white animate-bounce" /> : <Mic className="h-6 w-6 md:h-10 md:w-10 text-indigo-500 animate-pulse" />
-              ) : <MicOff className="h-6 w-6 md:h-10 md:w-10 text-zinc-700" />}
-              <p className="mt-2 md:mt-4 text-[8px] md:text-[10px] font-bold tracking-[0.3em] uppercase opacity-40">AI Senses</p>
+            <div className={`w-32 h-32 md:w-64 md:h-64 rounded-full border-2 flex flex-col items-center justify-center transition-all duration-700 ${isCalling ? "border-indigo-500 bg-indigo-500/5" : "border-zinc-800"}`}>
+              {isCalling ? <Mic className="h-10 w-10 text-indigo-500" /> : <MicOff className="h-10 w-10 text-zinc-700" />}
             </div>
           </div>
 
-          {/* Camera Feed Container */}
-          <div className={`relative group transition-all duration-700 ease-in-out ${cameraActive ? 'opacity-100 scale-100 w-48 h-36 md:w-80 md:h-60' : 'opacity-0 scale-95 w-0 h-0 overflow-hidden'}`}>
-            <video 
-              ref={videoRef} 
-              autoPlay 
-              playsInline 
-              muted 
-              className="w-full h-full object-cover rounded-[1.5rem] md:rounded-[2.5rem] border-2 border-zinc-800 bg-zinc-900 shadow-2xl transition-all duration-500"
-            />
-            <div className="absolute bottom-2 left-2 md:bottom-4 md:left-4">
-              <Badge className="bg-black/60 backdrop-blur-md border-zinc-700 text-[8px] md:text-[10px] text-zinc-300 px-2 md:px-3">Candidate Feed</Badge>
-            </div>
+          {/* Camera */}
+          <div className={`relative transition-all duration-700 ${cameraActive ? 'opacity-100 w-80 h-60' : 'opacity-0 w-0 h-0 overflow-hidden'}`}>
+            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover rounded-[2.5rem] border-2 border-zinc-800 bg-zinc-900 shadow-2xl" />
           </div>
         </div>
 
-        {/* Transcription Display */}
-        <div className={`mt-8 md:mt-16 transition-all duration-500 w-full max-w-xl text-center px-2 ${isCalling ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-          <div className="bg-zinc-900/40 border border-zinc-800/50 backdrop-blur-md p-5 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] shadow-2xl">
-            <p className="text-base md:text-2xl font-medium text-zinc-200 leading-relaxed italic line-clamp-4 md:line-clamp-none">
-              {transcript ? `"${transcript}"` : "The AI is listening..."}
+        {/* Transcript */}
+        <div className={`mt-16 transition-all duration-500 w-full max-w-xl text-center ${isCalling ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="bg-zinc-900/40 border border-zinc-800/50 backdrop-blur-md p-8 rounded-[2.5rem]">
+            <p className="text-xl text-zinc-200 italic">
+              {transcript || "The AI is listening..."}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Controls Footer */}
-      <div className="w-full max-w-md flex flex-col gap-4 pb-4 md:pb-6 z-10">
+      {/* Footer Controls */}
+      <div className="w-full max-w-md flex flex-col gap-4 pb-6 z-10">
         <div className="flex gap-3">
-          <Button 
-            variant="outline" 
-            onClick={toggleCamera}
-            className={`flex-1 h-12 md:h-14 rounded-xl md:rounded-2xl border-zinc-800 transition-all ${cameraActive ? 'bg-zinc-800 text-white' : 'bg-transparent text-zinc-500 hover:text-white'}`}
-          >
-            {cameraActive ? <Video size={18} className="md:mr-2 text-indigo-400" /> : <VideoOff size={18} className="md:mr-2" />}
-            <span className="hidden xs:inline">{cameraActive ? "On" : "Off"}</span>
+          <Button variant="outline" onClick={toggleCamera} className={`flex-1 h-14 rounded-2xl border-zinc-800 ${cameraActive ? 'bg-zinc-800 text-white' : ''}`}>
+            {cameraActive ? <Video size={18} /> : <VideoOff size={18} />}
           </Button>
-
           <Button 
             disabled={isEnding}
             onClick={isCalling ? endInterview : startInterview}
-            className={`flex-[3] h-12 md:h-14 rounded-xl md:rounded-2xl font-bold text-sm md:text-lg transition-all ${isCalling ? 'bg-red-600 hover:bg-red-700' : 'bg-white text-black hover:bg-zinc-200 shadow-[0_0_30px_rgba(255,255,255,0.1)]'}`}
+            className={`flex-[3] h-14 rounded-2xl font-bold ${isCalling ? 'bg-red-600' : 'bg-white text-black'}`}
           >
-            {isEnding ? (
-              <><Loader2 className="mr-2 h-4 w-4 md:h-5 md:w-5 animate-spin" /> ANALYZING...</>
-            ) : (
-              isCalling ? <><PhoneOff size={18} className="mr-2" /> END</> : "START INTERVIEW"
-            )}
+            {isEnding ? "ANALYZING..." : (isCalling ? "END INTERVIEW" : "START INTERVIEW")}
           </Button>
         </div>
-        <p className="text-center text-zinc-600 text-[8px] md:text-[10px] tracking-widest uppercase font-medium">
-          Powered by MockWise Neural Engine
-        </p>
       </div>
     </div>
   );
