@@ -170,12 +170,10 @@ export default function Dashboard() {
 
           <div className="flex items-center gap-3 md:gap-6">
             <div className="sm:flex items-center gap-2 text-zinc-400 text-sm border-r border-zinc-800 pr-4">
-              <div className="w-6 h-6 rounded-full bg-zinc-900 flex items-center justify-center border border-zinc-800 shrink-0">
-                <User size={12} className="text-zinc-200" />
-              </div>
-             <span className="block font-medium text-slate-200">
-  {userData?.name}
-</span>
+              <User size={12} className="text-zinc-200" />
+              <span className="block font-medium text-slate-200">
+                {userData?.name}
+              </span>
             </div>
             <Button
               variant="ghost"
