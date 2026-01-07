@@ -8,7 +8,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Globe, BarChart3, ExternalLink, Newspaper, Loader2, ArrowLeft } from "lucide-react";
+import { Globe, BarChart3, ExternalLink, Newspaper, Loader2, ArrowLeft, Zap } from "lucide-react";
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import Cookies from "js-cookie";
 
@@ -119,47 +119,61 @@ export default function CommunityInsights() {
     );
 
     return (
-        <div className="p-6 md:p-10 bg-black min-h-screen text-white">
+        <div className="p-4 md:p-10 bg-black min-h-screen text-white">
             <div className="max-w-7xl mx-auto">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
+                {/* Header - Stacks on mobile */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                     <div>
-                        <h1 className="text-4xl font-black tracking-tight mb-2">Community Insights</h1>
-                        <p className="text-zinc-500">Real-time performance benchmarks and tech trends.</p>
+                        <h1 className="text-3xl md:text-4xl font-black tracking-tight mb-2 text-white">Community Insights</h1>
+                        <p className="text-zinc-500 text-sm md:text-base">Real-time performance benchmarks and tech trends.</p>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <Badge variant="outline" className="hidden sm:flex border-zinc-800 text-zinc-400 gap-2 px-3 py-1 mr-2">
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                        <Badge variant="outline" className="hidden lg:flex border-zinc-800 text-zinc-400 gap-2 px-3 py-1 mr-2 whitespace-nowrap">
                             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" /> Live Stats
                         </Badge>
-                        <Button onClick={() => router.push("/dashboard")} variant="outline" className="bg-zinc-950 border-zinc-800 hover:bg-zinc-900 text-zinc-300 hover:text-white rounded-xl gap-2 cursor-pointer">
+                        <Button onClick={() => router.push("/dashboard")} variant="outline" className="w-full sm:w-auto bg-zinc-950 border-zinc-800 hover:bg-zinc-900 text-zinc-300 hover:text-white rounded-xl gap-2 cursor-pointer h-10 px-4 text-sm">
                             <ArrowLeft size={16} /> Dashboard
                         </Button>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-                    <Card className="bg-zinc-950 border-zinc-800 p-6">
-                        <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-2">Global Avg Score</p>
-                        <h2 className="text-4xl font-black text-indigo-500">{stats.avgScore}%</h2>
-                        <Progress value={stats.avgScore} className="h-4 mt-4" />
+                {/* Top Statistics Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-8 md:mb-10">
+                    <Card className="bg-zinc-950 border-zinc-800 p-6 flex flex-col justify-between h-36 md:h-44">
+                        <div>
+                            <p className="text-zinc-500 text-[10px] md:text-xs font-bold uppercase tracking-widest mb-2">Global Avg Score</p>
+                            <h2 className="text-3xl md:text-4xl font-black text-indigo-500">{stats.avgScore}%</h2>
+                        </div>
+                        <Progress value={stats.avgScore} className="h-2 md:h-3 mt-4" />
                     </Card>
-                    <Card className="bg-zinc-950 border-zinc-800 p-6">
-                        <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-2">Your Average</p>
-                        <h2 className="text-2xl font-bold">{stats.userSessionCount > 0 ? `${stats.userAvgScore}%` : "--"}</h2>
-                        <p className="text-zinc-600 text-sm mt-2">{stats.userSessionCount} sessions recorded</p>
+                    <Card className="bg-zinc-950 border-zinc-800 p-6 flex flex-col justify-between h-36 md:h-44">
+                        <div>
+                            <p className="text-zinc-500 text-[10px] md:text-xs font-bold uppercase tracking-widest mb-1">Most Practiced</p>
+                            <h2 className="text-2xl md:text-3xl font-black text-white flex items-center gap-2">
+                                <Zap size={20} className="text-amber-500 fill-amber-500" /> {stats.topStack}
+                            </h2>
+                        </div>
+                        <p className="text-zinc-500 text-[10px] md:text-xs tracking-tight">Leading community trend</p>
                     </Card>
                 </div>
 
+                {/* Main Content Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-2 space-y-6">
-                        <Card className="bg-zinc-950 border-zinc-800 p-6">
+                        {/* Chart Card */}
+                        <Card className="bg-zinc-950 border-zinc-800 p-4 md:p-6">
                             <div className="flex items-center gap-2 mb-6 text-zinc-400">
                                 <BarChart3 size={18} />
-                                <CardTitle className="text-sm font-medium uppercase">Score Distribution</CardTitle>
+                                <CardTitle className="text-xs md:text-sm font-medium uppercase">Score Distribution</CardTitle>
                             </div>
-                            <div className="h-64 w-full">
+                            <div className="h-56 md:h-64 w-full">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={stats.scoreDistribution}>
                                         <XAxis dataKey="range" axisLine={false} tickLine={false} tick={{ fill: '#52525b', fontSize: 10 }} />
+                                        <Tooltip 
+                                            contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px', fontSize: '12px' }}
+                                            cursor={{ fill: '#18181b', opacity: 0.4 }}
+                                        />
                                         <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                                             {stats.scoreDistribution.map((entry, index) => (
                                                 <Cell key={`cell-${index}`} fill={entry.count > 0 ? '#6366f1' : '#18181b'} />
@@ -169,19 +183,23 @@ export default function CommunityInsights() {
                                 </ResponsiveContainer>
                             </div>
                         </Card>
-                        <Card className="bg-zinc-950 border-zinc-800 p-6">
-                             <CardTitle className="text-sm font-medium text-zinc-500 uppercase mb-6 flex items-center gap-2"><Globe size={16} /> Recent Global Activity</CardTitle>
-                             <div className="space-y-4">
+
+                        {/* Recent Activity Card */}
+                        <Card className="bg-zinc-950 border-zinc-800 p-4 md:p-6">
+                             <CardTitle className="text-xs md:text-sm font-medium text-zinc-500 uppercase mb-6 flex items-center gap-2">
+                                <Globe size={16} /> Recent Global Activity
+                             </CardTitle>
+                             <div className="space-y-3 md:space-y-4">
                                 {stats.recentActivity.map((activity, i) => (
-                                    <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-500 font-bold text-xs uppercase">{activity.techStack?.[0] || 'D'}</div>
-                                            <div>
-                                                <p className="text-sm font-medium text-zinc-200">{activity.techStack || 'Dev'} Interview</p>
-                                                <p className="text-xs text-zinc-500">Score: {activity.score}%</p>
+                                    <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50 gap-2">
+                                        <div className="flex items-center gap-3 overflow-hidden">
+                                            <div className="shrink-0 w-8 h-8 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-500 font-bold text-xs uppercase">{activity.techStack?.[0] || 'D'}</div>
+                                            <div className="truncate">
+                                                <p className="text-xs md:text-sm font-medium text-zinc-200 truncate">{activity.techStack || 'Dev'} Interview</p>
+                                                <p className="text-[10px] md:text-xs text-zinc-500">Score: {activity.score}%</p>
                                             </div>
                                         </div>
-                                        <Badge variant="secondary" className="bg-zinc-800 text-zinc-400 text-[10px] uppercase">
+                                        <Badge variant="secondary" className="shrink-0 bg-zinc-800 text-zinc-400 text-[9px] md:text-[10px] uppercase px-2 py-0">
                                             {activity.createdAt?.seconds ? new Date(activity.createdAt.seconds * 1000).toLocaleDateString() : "Just now"}
                                         </Badge>
                                     </div>
@@ -190,15 +208,25 @@ export default function CommunityInsights() {
                         </Card>
                     </div>
 
+                    {/* Sidebar News */}
                     <div className="space-y-6">
-                        <Card className="bg-zinc-950 border-zinc-800 p-6 border-t-indigo-500/50 border-t-2">
-                            <CardTitle className="text-sm font-medium text-zinc-200 uppercase mb-6 flex items-center gap-2"><Newspaper size={16} className="text-indigo-500" /> Trending Tech</CardTitle>
-                            <div className="space-y-5">
+                        <Card className="bg-zinc-950 border-zinc-800 p-4 md:p-6 border-t-indigo-500/50 border-t-2">
+                            <CardTitle className="text-xs md:text-sm font-medium text-zinc-200 uppercase mb-6 flex items-center gap-2">
+                                <Newspaper size={16} className="text-indigo-500" /> Trending Tech
+                            </CardTitle>
+                            <div className="space-y-5 md:space-y-6">
                                 {trendingNews.map((news) => (
                                     <a key={news.id} href={news.url} target="_blank" rel="noopener noreferrer" className="block group cursor-pointer">
-                                        <Badge className="mb-2 bg-zinc-900 text-indigo-400 group-hover:bg-indigo-500/10 border-none text-[10px] transition-colors">{news.tag}</Badge>
-                                        <h3 className="text-sm font-semibold text-zinc-300 group-hover:text-indigo-400 transition-colors leading-snug">{news.title}</h3>
-                                        <p className="text-[10px] text-zinc-600 mt-1 uppercase tracking-tighter">{news.time}</p>
+                                        <Badge className="mb-2 bg-zinc-900 text-indigo-400 group-hover:bg-indigo-500/10 border-none text-[9px] transition-colors font-bold tracking-tight">
+                                            {news.tag}
+                                        </Badge>
+                                        <h3 className="text-sm font-semibold text-zinc-300 group-hover:text-indigo-400 transition-colors leading-snug">
+                                            {news.title}
+                                        </h3>
+                                        <div className="flex items-center justify-between mt-2">
+                                            <p className="text-[9px] text-zinc-600 uppercase font-bold tracking-tighter">{news.time}</p>
+                                            <ExternalLink size={10} className="text-zinc-700 group-hover:text-indigo-500" />
+                                        </div>
                                     </a>
                                 ))}
                             </div>

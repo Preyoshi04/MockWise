@@ -2,14 +2,13 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import Cookies from "js-cookie"; // <--- ADD THIS
 
-// Define the shape of the context data
 interface AuthContextType {
   user: User | null;
   loading: boolean;
 }
 
-// Create the context with a clear type and an undefined default
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -19,21 +18,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
+      
+      // --- THE CRITICAL FIX ---
+      if (firebaseUser) {
+        // Set the session cookie so Middleware can see it
+        Cookies.set("session", firebaseUser.uid, { expires: 7, path: '/' });
+      } else {
+        // Clear the cookie if the user logs out
+        Cookies.remove("session");
+      }
+      // ------------------------
+
       setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
-  // We wrap children in a Fragment to ensure a valid React Node is returned
   return (
     <AuthContext.Provider value={{ user, loading }}>
-      <>{children}</>
+      {children}
     </AuthContext.Provider>
   );
 };
 
-// Custom hook to use the auth context
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

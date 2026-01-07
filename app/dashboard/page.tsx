@@ -5,27 +5,50 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { signOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  orderBy,
+  limit,
+} from "firebase/firestore";
 import Link from "next/link";
 import Cookies from "js-cookie";
 import { useUser } from "@/hooks/use-user";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { LogOut, PlusCircle, History, Trophy, ChevronRight, User, Loader2, Globe, Zap, SparklesIcon } from "lucide-react";
+import {
+  LogOut,
+  PlusCircle,
+  History,
+  Trophy,
+  ChevronRight,
+  User,
+  Loader2,
+  Globe,
+  Zap,
+  SparklesIcon,
+} from "lucide-react";
 import Image from "next/image";
 
 export default function Dashboard() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const { userData } = useUser();
+  const { userData, loadingg } = useUser();
   const [interviews, setInterviews] = useState<any[]>([]);
   const [fetching, setFetching] = useState(true);
-  const [communityStats, setCommunityStats] = useState({ 
-    avgScore: 0, 
+  const [communityStats, setCommunityStats] = useState({
+    avgScore: 0,
     topStack: "Next.js",
-    globalScores: [] as number[] 
+    globalScores: [] as number[],
   });
 
   useEffect(() => {
@@ -39,24 +62,34 @@ export default function Dashboard() {
       if (!user) return;
       setFetching(true);
       try {
-        const q = query(collection(db, "interviews"), where("userId", "==", user.uid), orderBy("createdAt", "desc"));
+        const q = query(
+          collection(db, "interviews"),
+          where("userId", "==", user.uid),
+          orderBy("createdAt", "desc")
+        );
         const querySnapshot = await getDocs(q);
-        const userDocs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const userDocs = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
         setInterviews(userDocs);
 
-        // Fetch Global Benchmarks (Synced with Community Page: 200 limit)
-        const cq = query(collection(db, "interviews"), orderBy("createdAt", "desc"), limit(200));
+        const cq = query(
+          collection(db, "interviews"),
+          orderBy("createdAt", "desc"),
+          limit(200)
+        );
         const cSnapshot = await getDocs(cq);
-        const cDocs = cSnapshot.docs.map(d => d.data());
+        const cDocs = cSnapshot.docs.map((d) => d.data());
 
         if (cDocs.length > 0) {
           const scores = cDocs.map((d: any) => Number(d.score) || 0);
           const total = scores.reduce((acc, curr) => acc + curr, 0);
-          
+
           setCommunityStats({
             avgScore: Math.round(total / cDocs.length),
             topStack: (cDocs[0] as any).techStack || "Next.js",
-            globalScores: scores
+            globalScores: scores,
           });
         }
       } catch (err: any) {
@@ -68,55 +101,43 @@ export default function Dashboard() {
     if (!loading && user) fetchData();
   }, [user, loading]);
 
-  // --- SYNCED PERCENTILE LOGIC ---
-const standing = (() => {
-  // 1. Check if user has any data at all
-  if (!interviews || interviews.length === 0) {
-    return { 
-      label: "Not Ranked", 
-      value: 0, 
-      sub: "Complete a session to see rank" 
+  const standing = (() => {
+    if (!interviews || interviews.length === 0) {
+      return {
+        label: "Not Ranked",
+        value: 0,
+        sub: "Complete a session to see rank",
+      };
+    }
+    const userAvg =
+      interviews.reduce((acc, curr) => acc + (Number(curr.score) || 0), 0) /
+      interviews.length;
+    if (userAvg === 0) {
+      return {
+        label: "Unranked",
+        value: 0,
+        sub: "Score above 0 to enter the leaderboards.",
+      };
+    }
+    const peopleBeaten = communityStats.globalScores.filter(
+      (score) => score < userAvg
+    ).length;
+    const totalGlobal = communityStats.globalScores.length || 1;
+    const percentile = Math.round((peopleBeaten / totalGlobal) * 100);
+    const topPercent = Math.max(1, 100 - percentile);
+
+    return {
+      label: `Top ${topPercent}%`,
+      value: percentile,
+      sub: `Outperforming ${percentile}% of the community.`,
     };
-  }
-
-  // 2. Calculate User's Average Score
-  const userAvg = interviews.reduce((acc, curr) => acc + (Number(curr.score) || 0), 0) / interviews.length;
-
-  // 3. Handle the "0 Score" case (Prevents awkward "Top 100%" display)
-  if (userAvg === 0) {
-    return { 
-      label: "Unranked", 
-      value: 0, 
-      sub: "Score above 0 to enter the leaderboards." 
-    };
-  }
-
-  // 4. Calculate Percentile
-  // Count how many people in the global pool (last 200) have a score LOWER than the user average
-  const peopleBeaten = communityStats.globalScores.filter(score => score < userAvg).length;
-  
-  // Use the exact same global pool size as the community page for the denominator
-  const totalGlobal = communityStats.globalScores.length || 1;
-  
-  // Percentile is (Beaten / Total) * 100
-  const percentile = Math.round((peopleBeaten / totalGlobal) * 100);
-  
-  // Top % is the Inverse (e.g., 90th percentile = Top 10%)
-  // Math.max(1, ...) ensures even the best user sees "Top 1%" instead of "Top 0%"
-  const topPercent = Math.max(1, 100 - percentile);
-
-  return {
-    label: `Top ${topPercent}%`,
-    value: percentile, // Used for the Progress bar width
-    sub: `Outperforming ${percentile}% of the community.`
-  };
-})();
+  })();
 
   const handleLogout = async () => {
     try {
       await signOut(auth);
       Cookies.remove("session");
-      Cookies.remove("uid"); // Clear both
+      Cookies.remove("uid");
       localStorage.clear();
       sessionStorage.clear();
       window.location.href = "/";
@@ -127,9 +148,11 @@ const standing = (() => {
 
   if (loading || !user) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-black text-white">
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-black text-white px-4 text-center">
         <Loader2 className="h-8 w-8 animate-spin text-zinc-500 mb-4" />
-        <p className="text-zinc-500 animate-pulse font-medium">Authenticating...</p>
+        <p className="text-zinc-500 animate-pulse font-medium">
+          Authenticating Session...
+        </p>
       </div>
     );
   }
@@ -139,71 +162,122 @@ const standing = (() => {
       <header className="border-b border-zinc-800 bg-black/50 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <SparklesIcon size={30} />
-            <h1 className="text-4xl font-bold tracking-tighter italic">MockWise</h1>
+            <SparklesIcon size={24} className="md:w-[30px] md:h-[30px]" />
+            <h1 className="text-xl md:text-4xl font-bold tracking-tighter italic">
+              MockWise
+            </h1>
           </div>
 
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2 text-zinc-400 text-sm border-r border-zinc-800 pr-3 md:pr-6">
-              <div className="w-6 h-6 rounded-full bg-zinc-900 flex items-center justify-center border border-zinc-800">
+          <div className="flex items-center gap-3 md:gap-6">
+            <div className="hidden sm:flex items-center gap-2 text-zinc-400 text-sm border-r border-zinc-800 pr-4">
+              <div className="w-6 h-6 rounded-full bg-zinc-900 flex items-center justify-center border border-zinc-800 shrink-0">
                 <User size={12} className="text-zinc-200" />
               </div>
-              <span className="font-medium text-zinc-200">{userData?.name || "Dev"}</span>
+              <span className="font-medium text-slate-200 truncate max-w-[150px]">
+                {/* 4. Display the name or a fallback */}
+                {userData?.name || "Developer"}
+              </span>
             </div>
-            <Button variant="ghost" onClick={handleLogout} className="text-zinc-400 hover:text-red-400 hover:bg-red-500/10 gap-2 transition-all">
+            <Button
+              variant="ghost"
+              onClick={handleLogout}
+              className="text-zinc-400 hover:text-red-400 hover:bg-red-500/10 gap-2 h-9 px-3"
+            >
               <LogOut size={16} />
-              <span>Sign Out</span>
+              <span className="hidden xs:inline">Sign Out</span>
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto p-6 md:p-10 space-y-10">
-        <section className="flex flex-col md:flex-row items-center gap-10 p-8 md:p-16 bg-gradient-to-br from-zinc-900 to-black rounded-[2.5rem] border border-zinc-800 relative group overflow-hidden">
-          <div className="flex-1 relative z-10">
-            <Badge className="mb-4 bg-white text-black hover:bg-zinc-200 py-1 px-4">AI-Powered Analysis</Badge>
-            <h2 className="text-4xl md:text-6xl font-bold mb-6 tracking-tight text-white leading-tight">
+      <main className="max-w-7xl mx-auto p-4 md:p-10 space-y-8 md:space-y-12">
+        {/* Hero Section - Responsive Flex and Padding */}
+        <section className="flex flex-col lg:flex-row items-center gap-8 md:gap-10 p-6 md:p-16 bg-gradient-to-br from-zinc-900 to-black rounded-[1.5rem] md:rounded-[2.5rem] border border-zinc-800 relative overflow-hidden">
+          <div className="flex-1 text-center lg:text-left z-10">
+            <Badge className="mb-4 bg-white text-black hover:bg-zinc-200 py-1 px-4 text-xs">
+              AI-Powered Analysis
+            </Badge>
+            <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-6 tracking-tight text-white leading-tight">
               Ready to land your <br />
-              <span className="text-zinc-500 italic font-serif">dream job?</span>
+              <span className="text-zinc-500 italic font-serif">
+                dream job?
+              </span>
             </h2>
-            <Button size="lg" onClick={() => router.push("/interview")} className="bg-white text-black hover:bg-zinc-200 rounded-full px-8 py-6 text-md font-bold transition-transform active:scale-95">
+            <Button
+              size="lg"
+              onClick={() => router.push("/interview")}
+              className="w-full sm:w-auto bg-white text-black hover:bg-zinc-200 rounded-full px-8 py-6 text-sm md:text-md font-bold transition-transform active:scale-95"
+            >
               <PlusCircle className="mr-2 h-5 w-5" /> START NEW INTERVIEW
             </Button>
           </div>
-          <div className="relative shrink-0 w-full md:w-1/3 max-w-[300px]">
-            <Image src="/robot.jpeg" alt="Robot" width={500} height={500} className="rounded-2xl border border-zinc-800 object-cover shadow-2xl" />
+          <div className="relative shrink-0 w-full sm:w-2/3 lg:w-1/3 max-w-[320px]">
+            <Image
+              src="/robot.jpeg"
+              alt="Robot"
+              width={500}
+              height={500}
+              className="rounded-2xl border border-zinc-800 object-cover shadow-2xl"
+            />
           </div>
         </section>
 
+        {/* Recent Sessions - Responsive Grid */}
         <section>
-          <div className="flex items-center gap-3 mb-8">
+          <div className="flex items-center gap-3 mb-6 md:mb-8">
             <div className="p-2 bg-zinc-900 rounded-lg border border-zinc-800">
-              <History size={20} className="text-zinc-400" />
+              <History size={18} className="text-zinc-400" />
             </div>
-            <h3 className="text-2xl font-bold text-white tracking-tight">Recent Sessions</h3>
+            <h3 className="text-xl md:text-2xl font-bold text-white tracking-tight">
+              Recent Sessions
+            </h3>
           </div>
 
           {fetching ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {[1, 2, 3].map((i) => <div key={i} className="h-48 rounded-2xl bg-zinc-900/50 animate-pulse border border-zinc-800" />)}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="h-48 rounded-2xl bg-zinc-900/50 animate-pulse border border-zinc-800"
+                />
+              ))}
             </div>
           ) : interviews.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {interviews.map((interview) => (
-                <Card key={interview.id} className="bg-zinc-950 border-zinc-800 hover:border-zinc-700 transition-all group">
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <Badge variant="outline" className="border-zinc-700 text-zinc-400 text-[10px]">{interview.techStack || "General"}</Badge>
+                <Card
+                  key={interview.id}
+                  className="bg-zinc-950 border-zinc-800 hover:border-zinc-700 transition-all group flex flex-col"
+                >
+                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <Badge
+                      variant="outline"
+                      className="border-zinc-700 text-zinc-400 text-[10px]"
+                    >
+                      {interview.techStack || "General"}
+                    </Badge>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-2xl font-bold text-white">{interview.score}</span>
+                      <span className="text-xl md:text-2xl font-bold text-white">
+                        {interview.score}
+                      </span>
                       <span className="text-[10px] text-zinc-500">/100</span>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-zinc-400 text-sm line-clamp-3 italic leading-relaxed">&quot;{interview.feedback || "Processing AI insights..."}&quot;</p>
+                  <CardContent className="flex-1">
+                    <p className="text-zinc-400 text-xs md:text-sm line-clamp-3 italic leading-relaxed">
+                      &quot;{interview.feedback || "Processing AI insights..."}
+                      &quot;
+                    </p>
                   </CardContent>
-                  <CardFooter>
-                    <Link href={`/dashboard/analysis/${interview.id}`} className="w-full">
-                      <Button variant="secondary" className="w-full justify-between bg-zinc-900 text-zinc-300 border-zinc-800">
+                  <CardFooter className="pt-2">
+                    <Link
+                      href={`/dashboard/analysis/${interview.id}`}
+                      className="w-full"
+                    >
+                      <Button
+                        variant="secondary"
+                        className="w-full justify-between bg-zinc-900 text-zinc-300 border-zinc-800 text-xs h-9"
+                      >
                         Detailed Analysis <ChevronRight size={14} />
                       </Button>
                     </Link>
@@ -212,41 +286,77 @@ const standing = (() => {
               ))}
             </div>
           ) : (
-            <div className="border border-dashed border-zinc-800 rounded-[2rem] py-20 text-center bg-zinc-950/50">
-              <Trophy className="mx-auto h-12 w-12 text-zinc-700 mb-4" />
-              <p className="text-zinc-500 mb-6">Your history is looking a bit empty.</p>
-              <Button variant="outline" onClick={() => router.push("/interview")} className="border-zinc-700 text-zinc-400">Record your first session</Button>
+            <div className="border border-dashed border-zinc-800 rounded-[1.5rem] md:rounded-[2rem] py-16 md:py-20 text-center bg-zinc-950/50 px-4">
+              <Trophy className="mx-auto h-10 w-10 text-zinc-700 mb-4" />
+              <p className="text-zinc-500 mb-6 text-sm">
+                Your history is looking a bit empty.
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => router.push("/interview")}
+                className="border-zinc-700 text-zinc-400 text-xs"
+              >
+                Record your first session
+              </Button>
             </div>
           )}
         </section>
 
+        {/* Bottom Section - Stack on Mobile */}
         <section className="pt-6 border-t border-zinc-900">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="lg:col-span-2 bg-zinc-950 border-zinc-800 p-8 flex flex-col md:flex-row items-center justify-between gap-6">
-              <div>
-                <h4 className="text-xl font-bold text-white mb-2 flex items-center gap-2"><Globe className="text-indigo-500" size={20} /> Community Insights</h4>
-                <p className="text-sm text-zinc-500 max-w-sm">Global benchmark for 2026. See how your scores compare to others.</p>
-                <div className="mt-6 flex gap-8">
+            <Card className="lg:col-span-2 bg-zinc-950 border-zinc-800 p-6 md:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+              <div className="w-full sm:w-auto">
+                <h4 className="text-lg md:text-xl font-bold text-white mb-2 flex items-center gap-2">
+                  <Globe className="text-indigo-500" size={18} /> Community
+                  Insights
+                </h4>
+                <p className="text-xs md:text-sm text-zinc-500 max-w-sm">
+                  Global benchmark for 2026. See how your scores compare to
+                  others.
+                </p>
+                <div className="mt-6 flex gap-6 md:gap-8">
                   <div>
-                    <p className="text-[10px] uppercase tracking-widest text-zinc-600 font-bold mb-1">Global Avg</p>
-                    <p className="text-2xl font-black text-indigo-400">{communityStats.avgScore}%</p>
+                    <p className="text-[9px] md:text-[10px] uppercase tracking-widest text-zinc-600 font-bold mb-1">
+                      Global Avg
+                    </p>
+                    <p className="text-xl md:text-2xl font-black text-indigo-400">
+                      {communityStats.avgScore}%
+                    </p>
                   </div>
                   <div>
-                    <p className="text-[10px] uppercase tracking-widest text-zinc-600 font-bold mb-1">Trending Stack</p>
-                    <p className="text-2xl font-black text-yellow-500 flex items-center gap-1"><Zap size={16} fill="currentColor" /> {communityStats.topStack}</p>
+                    <p className="text-[9px] md:text-[10px] uppercase tracking-widest text-zinc-600 font-bold mb-1">
+                      Trending Stack
+                    </p>
+                    <p className="text-xl md:text-2xl font-black text-yellow-500 flex items-center gap-1">
+                      <Zap size={14} fill="currentColor" />{" "}
+                      {communityStats.topStack}
+                    </p>
                   </div>
                 </div>
               </div>
-              <Link href="/dashboard/community">
-                <Button className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-6">Explore Network <ChevronRight size={16} /></Button>
+              <Link href="/dashboard/community" className="w-full sm:w-auto">
+                <Button className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-6 py-5 md:py-0 text-xs md:text-sm">
+                  Explore Network <ChevronRight size={16} />
+                </Button>
               </Link>
             </Card>
 
-            <Card className={`border-zinc-800 p-8 flex flex-col justify-center transition-colors ${interviews.length > 0 ? 'bg-zinc-950' : 'bg-zinc-900/30'}`}>
-              <p className="text-indigo-400 text-xs font-bold uppercase mb-2">Your Standing</p>
-              <h2 className="text-4xl font-black text-white mb-4">{standing.label}</h2>
+            <Card
+              className={`border-zinc-800 p-6 md:p-8 flex flex-col justify-center transition-colors ${
+                interviews.length > 0 ? "bg-zinc-950" : "bg-zinc-900/30"
+              }`}
+            >
+              <p className="text-indigo-400 text-[10px] md:text-xs font-bold uppercase mb-2">
+                Your Standing
+              </p>
+              <h2 className="text-3xl md:text-4xl font-black text-white mb-4">
+                {standing.label}
+              </h2>
               <Progress value={standing.value} className="h-1 bg-zinc-900" />
-              <p className="text-zinc-600 text-[10px] mt-4 italic">{standing.sub}</p>
+              <p className="text-zinc-600 text-[9px] md:text-[10px] mt-4 italic">
+                {standing.sub}
+              </p>
             </Card>
           </div>
         </section>

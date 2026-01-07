@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -48,18 +49,18 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background Orbs for that "Premium" look */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-zinc-900 rounded-full blur-[120px] opacity-50" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-zinc-800 rounded-full blur-[120px] opacity-30" />
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background Orbs - Tinted Slate/Indigo */}
+      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-slate-800 rounded-full blur-[140px] opacity-40 pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-950 rounded-full blur-[120px] opacity-30 pointer-events-none" />
 
-      <Card className="w-full max-w-md bg-zinc-950/50 border-zinc-800 backdrop-blur-xl relative z-10 shadow-2xl">
+      <Card className="w-full max-w-md bg-slate-900/40 border-slate-800/60 backdrop-blur-2xl relative z-10 shadow-2xl ring-1 ring-white/5">
         <CardHeader className="space-y-2 text-center pb-8">
-          <div className="mx-auto w-12 h-12 bg-white rounded-xl flex items-center justify-center mb-4 shadow-[0_0_20px_rgba(255,255,255,0.2)]">
-            <Sparkles className="text-black h-6 w-6" />
+          <div className="mx-auto w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mb-4 shadow-[0_0_30px_rgba(241,245,249,0.2)]">
+            <Sparkles className="text-slate-950 h-7 w-7" />
           </div>
-          <CardTitle className="text-3xl font-bold tracking-tight text-white">Welcome Back</CardTitle>
-          <CardDescription className="text-zinc-500">
+          <CardTitle className="text-3xl font-black tracking-tight text-slate-50">Welcome Back</CardTitle>
+          <CardDescription className="text-slate-400 font-medium">
             Enter your credentials to access your workspace
           </CardDescription>
         </CardHeader>
@@ -67,41 +68,41 @@ export default function LoginPage() {
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-6">
             {error && (
-              <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 text-xs rounded-lg text-center font-medium animate-in fade-in zoom-in duration-300">
+              <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl text-center font-semibold animate-in fade-in zoom-in duration-300">
                 {error}
               </div>
             )}
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-zinc-400 ml-1">Email</Label>
+                <Label htmlFor="email" className="text-slate-400 ml-1 text-xs font-bold uppercase tracking-wider">Email Address</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-zinc-600" />
+                  <Mail className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-500" />
                   <Input
                     id="email"
                     name="email"
                     type="email"
-                    placeholder="ENTER YOUR EMAIL ADDRESS"
+                    placeholder="name@company.com"
                     required
-                    className="bg-zinc-900/50 border-zinc-800 pl-10 text-white placeholder:text-zinc-700 focus:ring-zinc-700 h-11"
+                    className="bg-slate-950/50 border-slate-800 pl-11 text-slate-100 placeholder:text-slate-600 focus:ring-slate-700 focus:border-slate-600 h-12 rounded-xl transition-all"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between ml-1">
-                  <Label htmlFor="password" className="text-zinc-400">Password</Label>
-                  <Link href="#" className="text-[10px] text-zinc-600 hover:text-zinc-400">Forgot?</Link>
+                  <Label htmlFor="password" className="text-slate-400 text-xs font-bold uppercase tracking-wider">Password</Label>
+                  <Link href="#" className="text-[10px] font-bold text-slate-500 hover:text-indigo-400 transition-colors">Forgot Password?</Link>
                 </div>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-zinc-600" />
+                  <Lock className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-500" />
                   <Input
                     id="password"
                     name="password"
                     type="password"
-                    placeholder="ENTER YOUR PASSWORD"
+                    placeholder="••••••••"
                     required
-                    className="bg-zinc-900/50 border-zinc-800 pl-10 text-white placeholder:text-zinc-700 focus:ring-zinc-700 h-11"
+                    className="bg-slate-950/50 border-slate-800 pl-11 text-slate-100 placeholder:text-slate-600 focus:ring-slate-700 focus:border-slate-600 h-12 rounded-xl transition-all"
                   />
                 </div>
               </div>
@@ -110,7 +111,7 @@ export default function LoginPage() {
             <Button 
               type="submit" 
               disabled={loading}
-              className="w-full bg-white text-black hover:bg-zinc-200 h-12 rounded-xl font-bold transition-all active:scale-[0.98]"
+              className="w-full bg-slate-50 text-slate-950 hover:bg-white h-12 rounded-xl font-black transition-all active:scale-[0.98] shadow-lg shadow-slate-950/20"
             >
               {loading ? (
                 <div className="flex items-center gap-2">
@@ -127,16 +128,20 @@ export default function LoginPage() {
           </form>
         </CardContent>
 
-        <CardFooter className="flex flex-col space-y-4 pb-8">
+        <CardFooter className="flex flex-col space-y-6 pb-8">
           <div className="relative w-full">
-            <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-zinc-900" /></div>
-            <div className="relative flex justify-center text-[10px] uppercase"><span className="bg-zinc-950 px-2 text-zinc-600">Secure Access</span></div>
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-slate-800" />
+            </div>
+            <div className="relative flex justify-center text-[10px] uppercase tracking-[0.2em] font-bold">
+              <span className="bg-[#0f172a] px-3 text-slate-600">Secure Protocol</span>
+            </div>
           </div>
           
-          <p className="text-center text-zinc-500 text-sm">
-            Don't have an account?{" "}
-            <Link href="/auth/register" className="text-white font-bold hover:text-zinc-300 transition-colors">
-              Join MockWise
+          <p className="text-center text-slate-400 text-sm font-medium">
+            New to the platform?{" "}
+            <Link href="/auth/register" className="text-indigo-400 font-bold hover:text-indigo-300 transition-colors underline-offset-4 hover:underline">
+              Create Account
             </Link>
           </p>
         </CardFooter>

@@ -1,7 +1,7 @@
 "use server";
 
 import { auth, db } from "@/lib/firebase";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 
 export async function registerUser(formData: FormData) {
@@ -14,7 +14,7 @@ export async function registerUser(formData: FormData) {
   }
 
   try {
-    // 1. Create User in Firebase Auth
+    // 1. Create User in Firebase
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
 
@@ -28,8 +28,16 @@ export async function registerUser(formData: FormData) {
       plan: "free",
     });
 
+    /** * CRITICAL: Firebase often auto-signs in the user on the current instance.
+     * We sign out immediately to ensure no "ghost session" exists that 
+     * would trigger the Middleware redirect to Dashboard.
+     */
+    await signOut(auth);
+
+    // Return only plain serializable data
     return { success: true, uid: user.uid };
   } catch (error: any) {
-    return { error: error.message };
+    console.error("Registration Error:", error.code);
+    return { error: error.message || "Failed to create account" };
   }
 }
