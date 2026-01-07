@@ -158,56 +158,59 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-zinc-100 font-sans">
-      <header className="border-b border-zinc-800 bg-black/50 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <SparklesIcon size={24} className="md:w-[30px] md:h-[30px]" />
-            <h1 className="text-xl md:text-4xl font-bold tracking-tighter italic">
-              MockWise
-            </h1>
-          </div>
-
-          <div className="flex items-center gap-3 md:gap-6">
-            <Link
-              href="/dashboard/profile"
-              className="hover:opacity-80 transition-opacity"
-            >
-              <div className="flex items-center gap-2 text-zinc-400 text-sm border-r border-zinc-800 pr-4">
-                <User size={14} className="text-zinc-200" />
-                <span className="font-medium text-slate-200 truncate max-w-[100px]">
-                  {userData?.name || "Dev"}
-                </span>
-              </div>
-            </Link>
-            <Button
-              variant="ghost"
-              onClick={handleLogout}
-              className="text-zinc-400 hover:text-red-400 hover:bg-red-500/10 gap-2 h-9 px-3"
-            >
-              <LogOut size={16} />
-              <span className="text-sm sm:text-xs">Sign Out</span>
-            </Button>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-black text-slate-100 font-sans">
+      
+      <header className="border-b border-slate-800 bg-black/50 backdrop-blur-md sticky top-0 z-50">
+           <div className="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
+             {/* Logo Section */}
+             <div className="flex items-center gap-2">
+               <SparklesIcon size={24} className="md:w-[30px] md:h-[30px]" />
+               <h1 className="text-xl md:text-4xl font-bold tracking-tighter italic text-white">
+                 MockWise
+               </h1>
+             </div>
+     
+             {/* Actions Section */}
+             <div className="flex items-center gap-3 md:gap-6">
+               <Link
+                 href="/dashboard/profile"
+                 className="hover:opacity-80 transition-opacity"
+               >
+                 <div className="flex items-center gap-2 text-slate-400 text-sm border-r border-slate-800 pr-4">
+                   <User size={14} className="text-slate-200" />
+                   <span className="font-medium text-slate-200 truncate max-w-[100px]">
+                     {userData?.name || "Dev"}
+                   </span>
+                 </div>
+               </Link>
+               <Button
+                 variant="ghost"
+                 onClick={handleLogout}
+                 className="text-slate-400 hover:text-red-400 hover:bg-red-500/10 gap-2 h-9 px-3"
+               >
+                 <LogOut size={16} />
+                 <span className="text-sm sm:text-xs">Sign Out</span>
+               </Button>
+             </div>
+           </div>
+         </header>
 
       <main className="max-w-7xl mx-auto p-4 md:p-10 space-y-8 md:space-y-12">
-        <section className="flex flex-col lg:flex-row items-center gap-8 md:gap-10 p-6 md:p-16 bg-gradient-to-br from-zinc-900 to-black rounded-[1.5rem] md:rounded-[2.5rem] border border-zinc-800 relative overflow-hidden">
+        <section className="flex flex-col lg:flex-row items-center gap-8 md:gap-10 p-6 md:p-16 bg-gradient-to-br from-slate-900 to-black rounded-[1.5rem] md:rounded-[2.5rem] border border-slate-800 relative overflow-hidden">
           <div className="flex-1 text-center lg:text-left z-10">
-            <Badge className="mb-4 bg-white text-black hover:bg-zinc-200 py-1 px-4 text-xs">
+            <Badge className="mb-4 bg-white text-black hover:bg-slate-200 py-1 px-4 text-xs">
               AI-Powered Analysis
             </Badge>
             <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-6 tracking-tight text-white leading-tight">
               Ready to land your <br />
-              <span className="text-zinc-500 italic font-serif">
+              <span className="text-slate-500 italic font-serif">
                 dream job?
               </span>
             </h2>
             <Button
               size="lg"
-              onClick={() => router.push("/dashboard/interview")}
-              className="w-full sm:w-auto bg-white text-black hover:bg-zinc-200 rounded-full px-8 py-6 text-sm md:text-md font-bold transition-transform active:scale-95"
+              onClick={() => router.push("/interview")}
+              className="w-full sm:w-auto bg-white text-black hover:bg-slate-200 rounded-full px-8 py-6 text-sm md:text-md font-bold transition-transform active:scale-95"
             >
               <PlusCircle className="mr-2 h-5 w-5" /> START NEW INTERVIEW
             </Button>
@@ -218,17 +221,17 @@ export default function Dashboard() {
               alt="Robot"
               width={500}
               height={500}
-              className="rounded-2xl border border-zinc-800 object-cover shadow-2xl"
+              className="rounded-2xl border border-slate-800 object-cover shadow-2xl"
             />
           </div>
         </section>
 
         <section>
-          <div className="flex items-center gap-3 mb-6 md:mb-8">
-            <div className="p-2 bg-zinc-900 rounded-lg border border-zinc-800">
-              <History size={18} className="text-zinc-400" />
+          <div className="flex items-center justify-center gap-3 mb-6 md:mb-8">
+            <div className="p-2 bg-slate-900 rounded-lg border border-slate-800">
+              <History size={25} className="text-slate-400" />
             </div>
-            <h3 className="text-xl md:text-2xl font-bold text-white tracking-tight">
+            <h3 className="text-xl md:text-2xl font-bold text-slate-300 tracking-tight uppercase">
               Recent Sessions
             </h3>
           </div>
@@ -238,7 +241,7 @@ export default function Dashboard() {
               {[1, 2, 3].map((i) => (
                 <div
                   key={i}
-                  className="h-48 rounded-2xl bg-zinc-900/50 animate-pulse border border-zinc-800"
+                  className="h-48 rounded-2xl bg-slate-900/50 animate-pulse border border-slate-800"
                 />
               ))}
             </div>
@@ -247,12 +250,12 @@ export default function Dashboard() {
               {interviews.map((interview) => (
                 <Card
                   key={interview.id}
-                  className="bg-zinc-950 border-zinc-800 hover:border-zinc-700 transition-all group flex flex-col"
+                  className="bg-slate-950 border-slate-800 hover:border-slate-700 transition-all group flex flex-col"
                 >
                   <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
                     <Badge
                       variant="outline"
-                      className="border-zinc-700 text-zinc-400 text-[10px]"
+                      className="border-slate-700 text-slate-400 text-[10px]"
                     >
                       {interview.techStack || "General"}
                     </Badge>
@@ -260,11 +263,11 @@ export default function Dashboard() {
                       <span className="text-xl md:text-2xl font-bold text-white">
                         {interview.score}
                       </span>
-                      <span className="text-[10px] text-zinc-500">/100</span>
+                      <span className="text-[10px] text-slate-500">/100</span>
                     </div>
                   </CardHeader>
                   <CardContent className="flex-1">
-                    <p className="text-zinc-400 text-xs md:text-sm line-clamp-3 italic leading-relaxed">
+                    <p className="text-slate-400 text-xs md:text-sm line-clamp-3 italic leading-relaxed">
                       &quot;{interview.feedback || "Processing AI insights..."}
                       &quot;
                     </p>
@@ -276,7 +279,7 @@ export default function Dashboard() {
                     >
                       <Button
                         variant="secondary"
-                        className="w-full justify-between bg-zinc-900 text-zinc-300 border-zinc-800 text-xs h-9"
+                        className="w-full justify-between bg-slate-900 text-slate-300 border-slate-800 text-xs h-9"
                       >
                         Detailed Analysis <ChevronRight size={14} />
                       </Button>
@@ -286,15 +289,15 @@ export default function Dashboard() {
               ))}
             </div>
           ) : (
-            <div className="border border-dashed border-zinc-800 rounded-[1.5rem] md:rounded-[2rem] py-16 md:py-20 text-center bg-zinc-950/50 px-4">
-              <Trophy className="mx-auto h-10 w-10 text-zinc-700 mb-4" />
-              <p className="text-zinc-500 mb-6 text-sm">
+            <div className="border border-dashed border-slate-800 rounded-[1.5rem] md:rounded-[2rem] py-16 md:py-20 text-center bg-slate-950/50 px-4">
+              <Trophy className="mx-auto h-10 w-10 text-slate-700 mb-4" />
+              <p className="text-slate-500 mb-6 text-sm">
                 Your history is looking a bit empty.
               </p>
               <Button
                 variant="outline"
                 onClick={() => router.push("/dashboard/interview")}
-                className="border-zinc-700 text-zinc-400 text-xs"
+                className="border-slate-700 text-slate-400 text-xs"
               >
                 Record your first session
               </Button>
@@ -302,21 +305,21 @@ export default function Dashboard() {
           )}
         </section>
 
-        <section className="pt-6 border-t border-zinc-900">
+        <section className="pt-6 border-t border-slate-900">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="lg:col-span-2 bg-zinc-950 border-zinc-800 p-6 md:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+            <Card className="lg:col-span-2 bg-slate-950 border-slate-800 p-6 md:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
               <div className="w-full sm:w-auto">
                 <h4 className="text-lg md:text-xl font-bold text-white mb-2 flex items-center gap-2">
                   <Globe className="text-indigo-500" size={18} /> Community
                   Insights
                 </h4>
-                <p className="text-xs md:text-sm text-zinc-500 max-w-sm">
+                <p className="text-xs md:text-sm text-slate-500 max-w-sm">
                   Global benchmark for 2026. See how your scores compare to
                   others.
                 </p>
                 <div className="mt-6 flex gap-6 md:gap-8">
                   <div>
-                    <p className="text-[9px] md:text-[10px] uppercase tracking-widest text-zinc-600 font-bold mb-1">
+                    <p className="text-[9px] md:text-[10px] uppercase tracking-widest text-slate-600 font-bold mb-1">
                       Global Avg
                     </p>
                     <p className="text-xl md:text-2xl font-black text-indigo-400">
@@ -324,7 +327,7 @@ export default function Dashboard() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-[9px] md:text-[10px] uppercase tracking-widest text-zinc-600 font-bold mb-1">
+                    <p className="text-[9px] md:text-[10px] uppercase tracking-widest text-slate-600 font-bold mb-1">
                       Trending Stack
                     </p>
                     <p className="text-xl md:text-2xl font-black text-yellow-500 flex items-center gap-1">
@@ -342,8 +345,8 @@ export default function Dashboard() {
             </Card>
 
             <Card
-              className={`border-zinc-800 p-6 md:p-8 flex flex-col justify-center transition-colors ${
-                interviews.length > 0 ? "bg-zinc-950" : "bg-zinc-900/30"
+              className={`border-slate-800 p-6 md:p-8 flex flex-col justify-center transition-colors ${
+                interviews.length > 0 ? "bg-slate-950" : "bg-slate-900/30"
               }`}
             >
               <p className="text-indigo-400 text-[10px] md:text-xs font-bold uppercase mb-2">
@@ -352,8 +355,8 @@ export default function Dashboard() {
               <h2 className="text-3xl md:text-4xl font-black text-white mb-4">
                 {standing.label}
               </h2>
-              <Progress value={standing.value} className="h-1 bg-zinc-900" />
-              <p className="text-zinc-600 text-[9px] md:text-[10px] mt-4 italic">
+              <Progress value={standing.value} className="h-1 bg-slate-900" />
+              <p className="text-slate-600 text-[9px] md:text-[10px] mt-4 italic">
                 {standing.sub}
               </p>
             </Card>

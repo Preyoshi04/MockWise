@@ -214,13 +214,13 @@ export default function InterviewPage() {
 
       <div className="w-full max-w-md flex flex-col gap-4 pb-6 z-10">
         <div className="flex gap-3">
-          <Button variant="outline" onClick={toggleCamera} className={`flex-1 h-14 rounded-2xl border-zinc-800 ${cameraActive ? 'bg-zinc-800 text-white' : ''}`}>
+          <Button onClick={toggleCamera} className={`flex-1 h-14 rounded-2xl bg-slate-800 border-zinc-800 cursor-pointer ${cameraActive ? 'bg-zinc-800 text-white' : ''}`}>
             {cameraActive ? <Video size={18} /> : <VideoOff size={18} />}
           </Button>
           <Button 
             disabled={isEnding}
             onClick={isCalling ? endInterview : startInterview}
-            className={`flex-[3] h-14 rounded-2xl font-bold ${isCalling ? 'bg-red-600' : 'bg-white text-black'}`}
+            className={`flex-[3] h-14 rounded-2xl cursor-pointer font-bold ${isCalling ? 'bg-red-600' : 'bg-slate-500 text-black hover:bg-slate-800 hover:text-white'}`}
           >
             {isEnding ? "ANALYZING..." : (isCalling ? "END INTERVIEW" : "START INTERVIEW")}
           </Button>
