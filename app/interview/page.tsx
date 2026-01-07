@@ -38,15 +38,28 @@ export default function InterviewPage() {
   const [cameraActive, setCameraActive] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isEnding, setIsEnding] = useState(false);
+  const [wasManipulated, setWasManipulated] = useState(false);
 
   const toggleCamera = async () => {
+    // If user changes camera during a live interview
     if (isCalling) {
-      toast.warning("Camera State Changed", {
-        description: "Consistency is important for AI analysis.",
-        duration: 3000,
+      setWasManipulated(true);
+      vapi.stop(); 
+      
+      toast.error("Interview Cancelled", {
+        description: "You manipulated the camera state. Redirecting to dashboard...",
+        duration: 4000,
       });
+
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      setStream(null);
+      setCameraActive(false);
+      return;
     }
 
+    // Normal camera toggle logic (Pre-interview)
     if (cameraActive) {
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
@@ -81,8 +94,15 @@ export default function InterviewPage() {
         stream.getTracks().forEach(track => track.stop());
       }
       
-      toast.success("Interview Completed", { description: "Redirecting to your dashboard..." });
-      setTimeout(() => router.push("/dashboard"), 2000);
+      // Only show success if it wasn't a camera manipulation
+      if (!wasManipulated) {
+        toast.success("Interview Completed", { description: "Redirecting to your dashboard..." });
+      }
+      
+      setTimeout(() => {
+        router.push("/dashboard");
+        setWasManipulated(false);
+      }, 2000);
     });
 
     vapi.on("speech-start", () => setIsAssistantTalking(true));
@@ -106,7 +126,7 @@ export default function InterviewPage() {
         stream.getTracks().forEach(track => track.stop());
       }
     };
-  }, [router, stream]); 
+  }, [router, stream, wasManipulated]); 
 
   const startInterview = () => {
     if (!user?.uid) {
@@ -114,14 +134,12 @@ export default function InterviewPage() {
       return;
     }
 
+    setWasManipulated(false);
     setIsCalling(true);
 
-    // Prepare greeting
     const firstName = userData?.name?.split(" ")[0] || "there";
     const assistantIdentifier = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID || "";
 
-    // The SDK expects the ID as the first argument, 
-    // and an object for overrides/options as the second.
     vapi.start(assistantIdentifier, {
       firstMessage: `Hello ${firstName}, I am your AI interviewer today. I've reviewed your profile and I'm ready to begin. How are you doing today?`,
       variableValues: { 
@@ -133,6 +151,7 @@ export default function InterviewPage() {
 
   const endInterview = () => {
     setIsEnding(true);
+    setWasManipulated(false); // Voluntary end
     vapi.stop();
   };
 
