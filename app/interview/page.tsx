@@ -7,7 +7,7 @@ import { useUser } from "@/hooks/use-user";
 import { useRouter } from "next/navigation";
 import { toast, Toaster } from "sonner";
 import { db } from "@/lib/firebase"; 
-import { doc, updateDoc, increment } from "firebase/firestore";
+import { doc, updateDoc, increment, addDoc, collection, serverTimestamp } from "firebase/firestore";
 
 // Shadcn + Lucide
 import { Button } from "@/components/ui/button";
@@ -50,7 +50,6 @@ export default function InterviewPage() {
       manipulationRef.current = true;
       vapi.stop(); 
       
-      // Instead of a toast, show the modal
       setShowAbortedModal(true);
 
       if (stream) {
@@ -86,23 +85,31 @@ export default function InterviewPage() {
       
       if (stream) stream.getTracks().forEach(track => track.stop());
       
-      // If it WAS NOT manipulated, record the session and show success toast
       if (!manipulationRef.current && user?.uid) {
         try {
+          // 1. UPDATE TOTAL COUNT IN USER PROFILE
           const userRef = doc(db, "users", user.uid);
           await updateDoc(userRef, { totalInterviews: increment(1) });
+
+          // 2. CREATE THE INTERVIEW RECORD (THE CARD)
+          await addDoc(collection(db, "interviews"), {
+            userId: user.uid,
+            createdAt: serverTimestamp(),
+            score: Math.floor(Math.random() * 15) + 75, // Placeholder score
+            techStack: userData?.techStack || "General",
+            feedback: "Great session! Your communication skills are strong. Analysis is being processed.",
+            status: "Completed"
+          });
           
           toast.success("Interview Completed", { 
             description: "Session recorded successfully." 
           });
           
-          // Redirect after success toast
           setTimeout(() => router.push("/dashboard"), 2000);
         } catch (err) {
           console.error("DB Update failed:", err);
         }
       }
-      // If it WAS manipulated, we do nothing here because the Modal is already open
     });
 
     vapi.on("speech-start", () => setIsAssistantTalking(true));
@@ -118,7 +125,7 @@ export default function InterviewPage() {
       vapi.stop(); 
       if (stream) stream.getTracks().forEach(track => track.stop());
     };
-  }, [router, stream, user?.uid]); 
+  }, [router, stream, user?.uid, userData]); 
 
   const startInterview = () => {
     if (!user?.uid) return;
@@ -140,7 +147,6 @@ export default function InterviewPage() {
     <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-between p-4 md:p-12 overflow-hidden">
       <Toaster position="top-center" theme="dark" richColors />
 
-      {/* --- ABORTED MODAL --- */}
       <Dialog open={showAbortedModal} onOpenChange={setShowAbortedModal}>
         <DialogContent className="bg-zinc-950 border-zinc-800 text-white rounded-[2rem]">
           <DialogHeader className="flex flex-col items-center gap-4">
@@ -163,10 +169,8 @@ export default function InterviewPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Background Glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] md:w-[600px] h-[300px] md:h-[600px] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none" />
 
-      {/* Header Info */}
       <div className="w-full max-w-5xl flex justify-between items-center z-10">
         <Button variant="ghost" onClick={() => router.back()} className="text-zinc-500 hover:text-white transition-colors h-9">
           <ArrowLeft className="mr-2 h-4 w-4" /> Exit Room
@@ -183,10 +187,8 @@ export default function InterviewPage() {
         </div>
       </div>
 
-      {/* Main Experience */}
       <div className="relative flex flex-col items-center justify-center z-10 w-full max-w-4xl flex-1">
         <div className="flex flex-col md:flex-row items-center justify-center gap-12 w-full">
-          {/* AI Orb */}
           <div className="relative">
             {isCalling && (
               <div className={`absolute inset-0 rounded-full border border-indigo-500/50 animate-ping ${isAssistantTalking ? 'opacity-100' : 'opacity-0'}`} />
@@ -196,13 +198,11 @@ export default function InterviewPage() {
             </div>
           </div>
 
-          {/* Camera */}
           <div className={`relative transition-all duration-700 ${cameraActive ? 'opacity-100 w-80 h-60' : 'opacity-0 w-0 h-0 overflow-hidden'}`}>
             <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover rounded-[2.5rem] border-2 border-zinc-800 bg-zinc-900 shadow-2xl" />
           </div>
         </div>
 
-        {/* Transcript */}
         <div className={`mt-16 transition-all duration-500 w-full max-w-xl text-center ${isCalling ? 'opacity-100' : 'opacity-0'}`}>
           <div className="bg-zinc-900/40 border border-zinc-800/50 backdrop-blur-md p-8 rounded-[2.5rem]">
             <p className="text-xl text-zinc-200 italic">
@@ -212,7 +212,6 @@ export default function InterviewPage() {
         </div>
       </div>
 
-      {/* Footer Controls */}
       <div className="w-full max-w-md flex flex-col gap-4 pb-6 z-10">
         <div className="flex gap-3">
           <Button variant="outline" onClick={toggleCamera} className={`flex-1 h-14 rounded-2xl border-zinc-800 ${cameraActive ? 'bg-zinc-800 text-white' : ''}`}>

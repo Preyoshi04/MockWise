@@ -193,7 +193,6 @@ export default function Dashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto p-4 md:p-10 space-y-8 md:space-y-12">
-        {/* Hero Section - Responsive Flex and Padding */}
         <section className="flex flex-col lg:flex-row items-center gap-8 md:gap-10 p-6 md:p-16 bg-gradient-to-br from-zinc-900 to-black rounded-[1.5rem] md:rounded-[2.5rem] border border-zinc-800 relative overflow-hidden">
           <div className="flex-1 text-center lg:text-left z-10">
             <Badge className="mb-4 bg-white text-black hover:bg-zinc-200 py-1 px-4 text-xs">
@@ -207,7 +206,7 @@ export default function Dashboard() {
             </h2>
             <Button
               size="lg"
-              onClick={() => router.push("/interview")}
+              onClick={() => router.push("/dashboard/interview")}
               className="w-full sm:w-auto bg-white text-black hover:bg-zinc-200 rounded-full px-8 py-6 text-sm md:text-md font-bold transition-transform active:scale-95"
             >
               <PlusCircle className="mr-2 h-5 w-5" /> START NEW INTERVIEW
@@ -224,7 +223,6 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* Recent Sessions - Responsive Grid */}
         <section>
           <div className="flex items-center gap-3 mb-6 md:mb-8">
             <div className="p-2 bg-zinc-900 rounded-lg border border-zinc-800">
@@ -295,7 +293,7 @@ export default function Dashboard() {
               </p>
               <Button
                 variant="outline"
-                onClick={() => router.push("/interview")}
+                onClick={() => router.push("/dashboard/interview")}
                 className="border-zinc-700 text-zinc-400 text-xs"
               >
                 Record your first session
@@ -304,7 +302,6 @@ export default function Dashboard() {
           )}
         </section>
 
-        {/* Bottom Section - Stack on Mobile */}
         <section className="pt-6 border-t border-zinc-900">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card className="lg:col-span-2 bg-zinc-950 border-zinc-800 p-6 md:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
