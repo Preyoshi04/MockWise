@@ -169,12 +169,17 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-3 md:gap-6">
-            <div className="sm:flex items-center gap-2 text-zinc-400 text-sm border-r border-zinc-800 pr-4">
-              <User size={12} className="text-zinc-200" />
-              <span className="block font-medium text-slate-200">
-                {userData?.name}
-              </span>
-            </div>
+            <Link
+              href="/dashboard/profile"
+              className="hover:opacity-80 transition-opacity"
+            >
+              <div className="flex items-center gap-2 text-zinc-400 text-sm border-r border-zinc-800 pr-4">
+                <User size={14} className="text-zinc-200" />
+                <span className="font-medium text-slate-200 truncate max-w-[100px]">
+                  {userData?.name || "Dev"}
+                </span>
+              </div>
+            </Link>
             <Button
               variant="ghost"
               onClick={handleLogout}
