@@ -183,7 +183,7 @@ export default function Dashboard() {
               className="text-zinc-400 hover:text-red-400 hover:bg-red-500/10 gap-2 h-9 px-3"
             >
               <LogOut size={16} />
-              <span className="hidden xs:inline">Sign Out</span>
+              <span className="text-sm sm:text-xs">Sign Out</span>
             </Button>
           </div>
         </div>
