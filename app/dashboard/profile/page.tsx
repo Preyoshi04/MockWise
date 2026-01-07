@@ -1,7 +1,11 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useUser } from "@/hooks/use-user";
+import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import {
   User,
   Mail,
@@ -17,10 +21,47 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function ProfilePage() {
+  const { userData, loadingg: userLoading } = useUser();
+  const { user } = useAuth();
   const router = useRouter();
-  const { userData, loadingg } = useUser();
 
-  if (loadingg) {
+  // States for fetching interviews
+  const [interviews, setInterviews] = useState<any[]>([]);
+  const [loadingInterviews, setLoadingInterviews] = useState(true);
+
+  // Fetch the interview data specifically for this user to calculate high score
+  useEffect(() => {
+    const fetchUserInterviews = async () => {
+      if (!user?.uid) return;
+      try {
+        const q = query(
+          collection(db, "interviews"),
+          where("userId", "==", user.uid)
+        );
+        const querySnapshot = await getDocs(q);
+        const data = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setInterviews(data);
+      } catch (error) {
+        console.error("Error fetching interviews:", error);
+      } finally {
+        setLoadingInterviews(false);
+      }
+    };
+
+    fetchUserInterviews();
+  }, [user]);
+
+  // Calculate highest score from local state
+  const highestScore =
+    interviews.length > 0
+      ? Math.max(...interviews.map((i) => Number(i.score) || 0))
+      : 0;
+
+  // Loading state
+  if (userLoading || loadingInterviews) {
     return (
       <div className="min-h-screen bg-[#050505] flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
@@ -37,12 +78,6 @@ export default function ProfilePage() {
       }).format(userData.createdAt.toDate())
     : "Recently";
 
-  // Highest score
-  const highestScore =
-    interviews.length > 0
-      ? Math.max(...interviews.map((i) => Number(i.score) || 0))
-      : 0;
-
   return (
     <div className="min-h-screen bg-[#050505] text-white p-6 md:p-12 relative overflow-hidden">
       {/* Background Glow */}
@@ -51,126 +86,108 @@ export default function ProfilePage() {
       <div className="max-w-4xl mx-auto relative z-10">
         <Button
           onClick={() => router.back()}
-          className="mb-8 text-slate-500 hover:text-white cursor-pointer"
+          variant="ghost"
+          className="mb-8 text-slate-400 hover:text-white cursor-pointer"
         >
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
         </Button>
 
-        <header className="mb-12 bg-slate-900/40 border border-slate-800/60 backdrop-blur-2xl rounded-[2.5rem] p-8 md:p-10 flex items-center gap-6">
-          <div className="flex items-center gap-6">
-            <div className="w-24 h-24 rounded-[2rem] bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shadow-[0_0_40px_rgba(99,102,241,0.1)]">
-              <User size={48} className="text-indigo-400" />
-            </div>
-            <div>
-              <h1 className="text-4xl font-black tracking-tight">
-                {userData?.name || "Developer"}
-              </h1>
-              <p className="text-slate-500 font-medium mt-2">
-                Welcome To Your Profile
-              </p>
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* Profile Sidebar */}
+          <div className="space-y-6">
+            <Card className="bg-zinc-900/50 border-zinc-800 backdrop-blur-xl">
+              <CardContent className="pt-6 text-center">
+                <div className="w-24 h-24 bg-indigo-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-indigo-500/20">
+                  <User size={40} className="text-indigo-400" />
+                </div>
+                <h2 className="text-xl font-bold text-white mb-1">
+                  {userData?.name || "Developer"}
+                </h2>
+                <p className="text-sm text-zinc-500 mb-4">{userData?.email}</p>
+                <div className="flex justify-center gap-2">
+                  <div className="px-3 py-1 bg-zinc-800 rounded-full text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                    Pro Member
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-zinc-900/50 border-zinc-800">
+              <CardHeader>
+                <CardTitle className="text-sm font-medium text-zinc-400">
+                  Account Details
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-3 text-sm">
+                  <Mail size={16} className="text-zinc-600" />
+                  <span className="text-zinc-300 truncate">{userData?.email}</span>
+                </div>
+                <div className="flex items-center gap-3 text-sm">
+                  <Calendar size={16} className="text-zinc-600" />
+                  <span className="text-zinc-300">Joined {joinedDate}</span>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Basic Info */}
-          <Card className="bg-slate-900/40 border-slate-800/50 backdrop-blur-xl rounded-[2.5rem]">
-            <CardHeader>
-              <CardTitle className="text-lg text-slate-300 font-bold flex items-center gap-2">
-                <Contact size={30} className="text-slate-300" /> IDENTITY
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800">
-                  <Mail size={20} className="text-slate-400" />
-                </div>
-                <div>
-                  <p className="text-[10px] uppercase font-black tracking-widest text-slate-600">
-                    Email Address
-                  </p>
-                  <p className="text-slate-200 font-medium">
-                    {userData?.email || "N/A"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800">
-                  <Calendar size={20} className="text-slate-400" />
-                </div>
-                <div>
-                  <p className="text-[10px] uppercase font-black tracking-widest text-slate-600">
-                    Member Since
-                  </p>
-                  <p className="text-slate-200 font-medium">{joinedDate}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Stats Card */}
-          <Card className="bg-slate-900/40 border-slate-800/50 backdrop-blur-xl rounded-[2.5rem]">
-            <CardHeader>
-              <CardTitle className="text-lg text-slate-300 font-bold flex items-center gap-2">
-                <BarChart3 size={30} className="text-slate-300" /> PERFORMANCE
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800">
-                  <MessageCircleCode size={20} className="text-slate-400" />
-                </div>
-                <div>
-                  <p className="text-[10px] uppercase font-black tracking-widest text-slate-600">
-                    Total Interviews
-                  </p>
-                  <p className="text-slate-200 font-medium">
-                    {userData?.totalInterviews || 0} Sessions
-                  </p>
-                </div>
-              </div>
-
-              <Card className="bg-zinc-950 border-zinc-800 p-6 flex flex-col items-center justify-center">
-                <div className="p-3 bg-yellow-500/10 rounded-full mb-3">
-                  <Trophy className="text-yellow-500 h-6 w-6" />
-                </div>
-                <p className="text-xs uppercase tracking-widest text-zinc-500 font-bold mb-1">
-                  Personal Best
-                </p>
-                <h3 className="text-3xl font-black text-white">
-                  {highestScore}
-                  <span className="text-sm text-zinc-500 ml-1">/100</span>
-                </h3>
+          {/* Statistics Grid */}
+          <div className="md:col-span-2 space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Card className="bg-zinc-900/50 border-zinc-800">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-2 bg-indigo-500/10 rounded-lg">
+                      <BarChart3 className="text-indigo-400" size={20} />
+                    </div>
+                    <span className="text-[10px] font-bold text-zinc-500 uppercase">
+                      Total Sessions
+                    </span>
+                  </div>
+                  <h3 className="text-3xl font-bold text-white">
+                    {userData?.totalInterviews || 0}
+                  </h3>
+                </CardContent>
               </Card>
-            </CardContent>
-          </Card>
-        </div>
 
-        {/* Plan Status */}
-        <div className="mt-6 p-8 rounded-[2.5rem] bg-indigo-500/5 border border-indigo-500/10 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div>
-            <h3 className="text-xl font-bold">
-              Current Plan:{" "}
-              <span className="text-indigo-400 uppercase">
-                {userData?.plan || "Free"}
-              </span>
-            </h3>
+              <Card className="bg-zinc-900/50 border-zinc-800">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-2 bg-yellow-500/10 rounded-lg">
+                      <Trophy className="text-yellow-500" size={20} />
+                    </div>
+                    <span className="text-[10px] font-bold text-zinc-500 uppercase">
+                      Highest Score
+                    </span>
+                  </div>
+                  <h3 className="text-3xl font-bold text-white">
+                    {highestScore}
+                    <span className="text-sm text-zinc-500 ml-1">/100</span>
+                  </h3>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card className="bg-zinc-900/50 border-zinc-800">
+              <CardHeader>
+                <CardTitle className="text-lg font-bold">Bio & Goals</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-zinc-400 leading-relaxed italic">
+                  &quot;Preparing for top-tier technical roles. Focused on mastering system design and advanced problem-solving.&quot;
+                </p>
+                <div className="mt-6 flex flex-wrap gap-2">
+                  {["React", "Node.js", "System Design", "Next.js"].map((skill) => (
+                    <span key={skill} className="px-3 py-1 bg-indigo-500/5 border border-indigo-500/10 rounded-lg text-xs text-indigo-300">
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </div>
-          <Button className="bg-white text-black hover:bg-slate-200 text-xs p-3 rounded-2xl">
-            More Upgrades Coming Soon...
-          </Button>
         </div>
       </div>
-      {/* Footer Branding - Responsive Padding */}
-      <footer className="py-12 md:py-20 border-t border-slate-900 text-center px-4 fixed bottom-0 w-full">
-        <p className="text-slate-300 text-[10px] md:text-sm font-bold tracking-[0.2em] md:tracking-[0.4em] uppercase mb-2">
-          Build for the future of hiring
-        </p>
-        <p className="text-slate-300 text-[10px] md:text-xs font-bold tracking-[0.2em] md:tracking-[0.4em] uppercase">
-          &copy; 2026 MockWise
-        </p>
-      </footer>
     </div>
   );
 }
