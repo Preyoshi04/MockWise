@@ -132,8 +132,9 @@ export default function InterviewPage() {
     manipulationRef.current = false;
     setIsCalling(true);
     const assistantIdentifier = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID || "";
+    const firstName = userData?.name?.split(" ")[0] || "there";
     vapi.start(assistantIdentifier, {
-      firstMessage: `Hello there, I am your AI interviewer. How are you?`,
+      firstMessage: `Hello ${firstName}, I am your AI interviewer today. I've reviewed your profile and I'm ready to begin. How are you doing today?`,
     });
   };
 

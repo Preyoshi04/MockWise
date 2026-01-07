@@ -86,8 +86,8 @@ export default function ProfilePage() {
       <div className="max-w-4xl mx-auto relative z-10">
         <Button
           onClick={() => router.back()}
-          variant="ghost"
-          className="mb-8 text-slate-400 hover:text-white cursor-pointer"
+          variant="outline"
+          className="mb-8 text-slate-400 bg-slate-800 hover:text-white hover:bg-slate-900 cursor-pointer"
         >
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
         </Button>
@@ -95,7 +95,7 @@ export default function ProfilePage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Profile Sidebar */}
           <div className="space-y-6">
-            <Card className="bg-zinc-900/50 border-zinc-800 backdrop-blur-xl">
+            <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-xl">
               <CardContent className="pt-6 text-center">
                 <div className="w-24 h-24 bg-indigo-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-indigo-500/20">
                   <User size={40} className="text-indigo-400" />
@@ -103,29 +103,29 @@ export default function ProfilePage() {
                 <h2 className="text-xl font-bold text-white mb-1">
                   {userData?.name || "Developer"}
                 </h2>
-                <p className="text-sm text-zinc-500 mb-4">{userData?.email}</p>
+                <p className="text-sm text-slate-500 mb-4">{userData?.email}</p>
                 <div className="flex justify-center gap-2">
-                  <div className="px-3 py-1 bg-zinc-800 rounded-full text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                  <div className="px-3 py-1 bg-slate-800 rounded-full text-[10px] font-bold uppercase tracking-wider text-slate-400">
                     Pro Member
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-zinc-900/50 border-zinc-800">
+            <Card className="bg-slate-900/50 border-slate-800">
               <CardHeader>
-                <CardTitle className="text-sm font-medium text-zinc-400">
+                <CardTitle className="text-sm font-medium text-slate-400">
                   Account Details
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-3 text-sm">
-                  <Mail size={16} className="text-zinc-600" />
-                  <span className="text-zinc-300 truncate">{userData?.email}</span>
+                  <Mail size={16} className="text-slate-600" />
+                  <span className="text-slate-300 truncate">{userData?.email}</span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
-                  <Calendar size={16} className="text-zinc-600" />
-                  <span className="text-zinc-300">Joined {joinedDate}</span>
+                  <Calendar size={16} className="text-slate-600" />
+                  <span className="text-slate-300">Joined {joinedDate}</span>
                 </div>
               </CardContent>
             </Card>
@@ -134,13 +134,13 @@ export default function ProfilePage() {
           {/* Statistics Grid */}
           <div className="md:col-span-2 space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Card className="bg-zinc-900/50 border-zinc-800">
+              <Card className="bg-slate-900/50 border-slate-800">
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between mb-4">
                     <div className="p-2 bg-indigo-500/10 rounded-lg">
                       <BarChart3 className="text-indigo-400" size={20} />
                     </div>
-                    <span className="text-[10px] font-bold text-zinc-500 uppercase">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">
                       Total Sessions
                     </span>
                   </div>
@@ -150,41 +150,33 @@ export default function ProfilePage() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-zinc-900/50 border-zinc-800">
+              <Card className="bg-slate-900/50 border-slate-800">
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between mb-4">
                     <div className="p-2 bg-yellow-500/10 rounded-lg">
                       <Trophy className="text-yellow-500" size={20} />
                     </div>
-                    <span className="text-[10px] font-bold text-zinc-500 uppercase">
-                      Highest Score
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">
+                    Personal Highest Score
                     </span>
                   </div>
                   <h3 className="text-3xl font-bold text-white">
                     {highestScore}
-                    <span className="text-sm text-zinc-500 ml-1">/100</span>
+                    <span className="text-sm text-slate-500 ml-1">/100</span>
                   </h3>
                 </CardContent>
               </Card>
             </div>
 
-            <Card className="bg-zinc-900/50 border-zinc-800">
-              <CardHeader>
-                <CardTitle className="text-lg font-bold">Bio & Goals</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-zinc-400 leading-relaxed italic">
-                  &quot;Preparing for top-tier technical roles. Focused on mastering system design and advanced problem-solving.&quot;
-                </p>
-                <div className="mt-6 flex flex-wrap gap-2">
-                  {["React", "Node.js", "System Design", "Next.js"].map((skill) => (
-                    <span key={skill} className="px-3 py-1 bg-indigo-500/5 border border-indigo-500/10 rounded-lg text-xs text-indigo-300">
-                      {skill}
-                    </span>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            {/* Plan Status */}
+        <div className="mt-6 p-8 rounded-[2.5rem] bg-indigo-500/5 border border-indigo-500/10 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div>
+            <h3 className="text-xl font-bold">Current Plan: <span className="text-indigo-400 uppercase">{userData?.plan || "Free"}</span></h3>
+          </div>
+          <Button className="bg-white text-black hover:bg-slate-200 font-bold p-3 text-md rounded-2xl">
+            More Upgrades Coming Soon...
+          </Button>
+        </div>
           </div>
         </div>
       </div>
