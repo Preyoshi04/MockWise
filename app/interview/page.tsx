@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import Vapi from "@vapi-ai/web";
 import { useAuth } from "@/context/AuthContext";
+import { useUser } from "@/hooks/use-user"; 
 import { useRouter } from "next/navigation";
 import { toast, Toaster } from "sonner";
 
@@ -26,6 +27,7 @@ const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY || "");
 
 export default function InterviewPage() {
   const { user } = useAuth();
+  const { userData } = useUser(); 
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -104,16 +106,28 @@ export default function InterviewPage() {
         stream.getTracks().forEach(track => track.stop());
       }
     };
-  }, [router]); 
+  }, [router, stream]); 
 
   const startInterview = () => {
     if (!user?.uid) {
       toast.error("Session Error", { description: "User not authenticated." });
       return;
     }
+
     setIsCalling(true);
-    vapi.start(process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID || "", {
-      variableValues: { userId: user.uid },
+
+    // Prepare greeting
+    const firstName = userData?.name?.split(" ")[0] || "there";
+    const assistantIdentifier = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID || "";
+
+    // The SDK expects the ID as the first argument, 
+    // and an object for overrides/options as the second.
+    vapi.start(assistantIdentifier, {
+      firstMessage: `Hello ${firstName}, I am your AI interviewer today. I've reviewed your profile and I'm ready to begin. How are you doing today?`,
+      variableValues: { 
+        userId: user.uid,
+        userName: userData?.name || "Developer" 
+      },
     });
   };
 
