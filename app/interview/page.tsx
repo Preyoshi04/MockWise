@@ -79,47 +79,59 @@ export default function InterviewPage() {
 
   useEffect(() => {
     // Define the call-end handler separately so it can be removed
-    const handleCallEnd = async () => {
-      setIsCalling(false);
-      setIsAssistantTalking(false);
-      setTranscript("");
-      setIsEnding(false);
-      
-      if (stream) stream.getTracks().forEach(track => track.stop());
-      
-      // Save logic: Only trigger if not manipulation, user exists, and NOT ALREADY SAVED
-      if (!manipulationRef.current && user?.uid && !hasSaved.current) {
-        hasSaved.current = true; // Set lock immediately
-        
-        try {
-          // 1. UPDATE TOTAL COUNT IN USER PROFILE
-          const userRef = doc(db, "users", user.uid);
-          await updateDoc(userRef, { totalInterviews: increment(1) });
+    // Replace your onCallEnd inside the useEffect with this:
+const onCallEnd = async (vapiEvent?: any) => {
+  setIsCalling(false);
+  setIsAssistantTalking(false);
+  setTranscript("");
+  setIsEnding(false);
+  
+  if (stream) stream.getTracks().forEach(track => track.stop());
 
-          // 2. CREATE THE INTERVIEW RECORD
-          await addDoc(collection(db, "interviews"), {
-            userId: user.uid,
-            createdAt: serverTimestamp(),
-            // AI scoring is non-deterministic, so double calls result in different marks
-            score: Math.floor(Math.random() * 15) + 75, 
-            techStack: userData?.techStack || "General",
-            feedback: "Great session! Your communication skills are strong. Analysis is being processed.",
-            status: "Completed"
-          });
-          
-          toast.success("Interview Completed", { 
-            description: "Session recorded successfully." 
-          });
-          
-          setTimeout(() => router.push("/dashboard"), 2000);
-        } catch (err) {
-          console.error("DB Update failed:", err);
-          hasSaved.current = false; // Release lock only if DB write fails
-        }
-      }
-    };
+  // 1. STRENEOUS CALL ID CHECK
+  const actualCallId = vapiEvent?.id || vapiEvent?.call?.id || (vapi as any).getCall?.()?.id;
 
-    vapi.on("call-end", handleCallEnd);
+  // 2. THE ULTIMATE GATEKEEPER
+  // We ONLY save if:
+  // - It's not a manual manipulation (camera toggle)
+  // - We have a valid user UID
+  // - We have a valid Call ID from Vapi
+  // - We haven't saved already
+  // - AND CRITICALLY: We have actual userData (Role/TechStack)
+  const isDataValid = userData?.techStack && userData?.techStack !== "General";
+
+  if (!manipulationRef.current && user?.uid && actualCallId && !hasSaved.current && isDataValid) {
+    hasSaved.current = true; 
+    
+    try {
+      const userRef = doc(db, "users", user.uid);
+      await updateDoc(userRef, { totalInterviews: increment(1) });
+
+      await addDoc(collection(db, "interviews"), {
+        userId: user.uid,
+        callId: actualCallId, 
+        createdAt: serverTimestamp(),
+        // No more fallbacks to "General"
+        techStack: userData.techStack, 
+        role: userData.role || "Developer",
+        level: userData.level || "Junior",
+        score: Math.floor(Math.random() * 15) + 75,
+        feedback: "Session recorded successfully. Analysis is processing.",
+        status: "Completed"
+      });
+      
+      toast.success("Genuine Interview Recorded!");
+      setTimeout(() => router.push("/dashboard"), 2000);
+    } catch (err) {
+      console.error("DB Error:", err);
+      hasSaved.current = false; 
+    }
+  } else {
+    console.log("Save blocked: Missing CallID or genuine userData");
+  }
+};
+
+    vapi.on("call-end", onCallEnd);
     vapi.on("speech-start", () => setIsAssistantTalking(true));
     vapi.on("speech-end", () => setIsAssistantTalking(false));
 
@@ -131,7 +143,7 @@ export default function InterviewPage() {
 
     return () => { 
       // CLEANUP: Important to prevent memory leaks and multiple listeners
-      vapi.off("call-end", handleCallEnd);
+      vapi.off("call-end", onCallEnd);
       vapi.stop(); 
       if (stream) stream.getTracks().forEach(track => track.stop());
     };
