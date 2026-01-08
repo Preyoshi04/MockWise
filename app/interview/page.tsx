@@ -110,50 +110,37 @@ export default function InterviewPage() {
 
   // --- 2. The Core Interview Logic (Vapi Listeners) ---
   useEffect(() => {
-  const onCallEnd = async (vapiEvent?: any) => {
+    const onCallEnd = async (vapiEvent?: any) => {
   setIsCalling(false);
-  setIsAssistantTalking(false);
-  setIsEnding(false);
   stopCamera();
 
   if (sessionAborted.current) return;
 
-  // 1. Get the Call ID and UID
-  const callId = vapiEvent?.id || vapiEvent?.call?.id || "manual-id";
-  const currentUid = user?.uid || userIdRef.current;
-
-  // 2. Extract AI analysis from the event (This clears the red squiggles)
-  // Vapi sends the score and summary in the 'analysis' object
-  const vapiScore = vapiEvent?.analysis?.score || 85; 
-  const feedbackText = vapiEvent?.analysis?.summary || "Interview completed successfully.";
+  // 1. Get the data from the event (fixes red squiggles)
+  const vapiScore = vapiEvent?.analysis?.score || 0;
+  const feedbackText = vapiEvent?.analysis?.summary || "No feedback generated.";
+  const callId = vapiEvent?.id || "manual-id";
+  const currentUid = user?.uid;
 
   if (currentUid && !hasSaved.current) {
     hasSaved.current = true;
-    
     try {
-      // 3. Update User Session Count
-      const userRef = doc(db, "users", currentUid);
-      await updateDoc(userRef, { 
-        totalInterviews: increment(1) 
-      });
-
-      // 4. Save the ONE interview card to Firestore
+      // 2. Save using the EXACT fields your index expects
       await addDoc(collection(db, "interviews"), {
-        userId: currentUid,        // Saves your real UID
-        role: userData?.role || "Software Developer", 
+        userId: currentUid,
+        role: userData?.role || "Software Engineer",
         techStack: userData?.techStack || "Java",
         feedback: feedbackText,
-        createdAt: serverTimestamp(),
         score: vapiScore,
+        createdAt: serverTimestamp(),
         status: "Completed",
-        callId: callId
       });
 
-      toast.success("Interview Recorded!");
-      setTimeout(() => router.push("/dashboard"), 1500);
+      toast.success("Interview Saved!");
+      router.push("/dashboard");
     } catch (error) {
-      console.error("Frontend Save Error:", error);
-      hasSaved.current = false; 
+      console.error("Save Error:", error);
+      hasSaved.current = false;
     }
   }
 };
@@ -179,9 +166,10 @@ export default function InterviewPage() {
  const startInterview = () => {
   if (!user?.uid) return toast.error("Please log in first.");
 
-  // LOCK the current user's ID for the onCallEnd function
+  // LOCK the current user's ID so we have it when the call ends
   userIdRef.current = user.uid;
-  
+  console.log("Session started for User ID:", userIdRef.current);
+
   hasSaved.current = false;
   sessionAborted.current = false;
   initialCameraState.current = cameraActive;
@@ -192,10 +180,12 @@ export default function InterviewPage() {
 
   vapi.start(assistantId, {
     firstMessage: `Hello ${name}, I am your AI interviewer. Let's begin the session.`,
-    // Notice: variableValues is removed because we are saving via frontend instead of a Vapi tool.
+    // THIS LINE IS THE FIX: It sends your UID to the Vapi Tool
+    variableValues: {
+      userId: user.uid,
+    },
   });
 };
-
   const endInterview = () => {
     setIsEnding(true);
     vapi.stop();
