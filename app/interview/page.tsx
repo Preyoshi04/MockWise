@@ -110,7 +110,7 @@ export default function InterviewPage() {
 
   // --- 2. The Core Interview Logic (Vapi Listeners) ---
   useEffect(() => {
-    const onCallEnd = async (vapiEvent?: any) => {
+  const onCallEnd = async (vapiEvent?: any) => {
   setIsCalling(false);
   setIsAssistantTalking(false);
   setIsEnding(false);
@@ -118,13 +118,44 @@ export default function InterviewPage() {
 
   if (sessionAborted.current) return;
 
-  // REMOVE the addDoc and updateDoc logic from here!
-  // The Vapi Tool is now handling the database save.
-  
-  toast.success("Interview Completed!");
-  
-  // Wait a moment for the Vapi Tool to finish writing to DB, then redirect
-  setTimeout(() => router.push("/dashboard"), 2000);
+  // 1. Get the Call ID and UID
+  const callId = vapiEvent?.id || vapiEvent?.call?.id || "manual-id";
+  const currentUid = user?.uid || userIdRef.current;
+
+  // 2. Extract AI analysis from the event (This clears the red squiggles)
+  // Vapi sends the score and summary in the 'analysis' object
+  const vapiScore = vapiEvent?.analysis?.score || 85; 
+  const feedbackText = vapiEvent?.analysis?.summary || "Interview completed successfully.";
+
+  if (currentUid && !hasSaved.current) {
+    hasSaved.current = true;
+    
+    try {
+      // 3. Update User Session Count
+      const userRef = doc(db, "users", currentUid);
+      await updateDoc(userRef, { 
+        totalInterviews: increment(1) 
+      });
+
+      // 4. Save the ONE interview card to Firestore
+      await addDoc(collection(db, "interviews"), {
+        userId: currentUid,        // Saves your real UID
+        role: userData?.role || "Software Developer", 
+        techStack: userData?.techStack || "Java",
+        feedback: feedbackText,
+        createdAt: serverTimestamp(),
+        score: vapiScore,
+        status: "Completed",
+        callId: callId
+      });
+
+      toast.success("Interview Recorded!");
+      setTimeout(() => router.push("/dashboard"), 1500);
+    } catch (error) {
+      console.error("Frontend Save Error:", error);
+      hasSaved.current = false; 
+    }
+  }
 };
     // Attach Vapi Event Listeners
     vapi.on("call-end", onCallEnd);
@@ -148,16 +179,22 @@ export default function InterviewPage() {
  const startInterview = () => {
   if (!user?.uid) return toast.error("Please log in first.");
 
+  // LOCK the current user's ID for the onCallEnd function
+  userIdRef.current = user.uid;
+  
+  hasSaved.current = false;
+  sessionAborted.current = false;
+  initialCameraState.current = cameraActive;
+
   setIsCalling(true);
   const assistantId = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID || "";
+  const name = userData?.name?.split(" ")[0] || "Candidate";
 
   vapi.start(assistantId, {
-    // This injects the real UID into the Tool call
-    variableValues: {
-      userId: user.uid,
-    },
+    firstMessage: `Hello ${name}, I am your AI interviewer. Let's begin the session.`,
+    // Notice: variableValues is removed because we are saving via frontend instead of a Vapi tool.
   });
-}; 
+};
 
   const endInterview = () => {
     setIsEnding(true);
