@@ -112,37 +112,19 @@ export default function InterviewPage() {
   useEffect(() => {
     const onCallEnd = async (vapiEvent?: any) => {
   setIsCalling(false);
+  setIsAssistantTalking(false);
+  setIsEnding(false);
   stopCamera();
 
   if (sessionAborted.current) return;
 
-  // 1. Get the data from the event (fixes red squiggles)
-  const vapiScore = vapiEvent?.analysis?.score || 0;
-  const feedbackText = vapiEvent?.analysis?.summary || "No feedback generated.";
-  const callId = vapiEvent?.id || "manual-id";
-  const currentUid = user?.uid;
-
-  if (currentUid && !hasSaved.current) {
-    hasSaved.current = true;
-    try {
-      // 2. Save using the EXACT fields your index expects
-      await addDoc(collection(db, "interviews"), {
-        userId: currentUid,
-        role: userData?.role || "Software Engineer",
-        techStack: userData?.techStack || "Java",
-        feedback: feedbackText,
-        score: vapiScore,
-        createdAt: serverTimestamp(),
-        status: "Completed",
-      });
-
-      toast.success("Interview Saved!");
-      router.push("/dashboard");
-    } catch (error) {
-      console.error("Save Error:", error);
-      hasSaved.current = false;
-    }
-  }
+  // REMOVE the addDoc and updateDoc logic from here!
+  // The Vapi Tool is now handling the database save.
+  
+  toast.success("Interview Completed!");
+  
+  // Wait a moment for the Vapi Tool to finish writing to DB, then redirect
+  setTimeout(() => router.push("/dashboard"), 2000);
 };
     // Attach Vapi Event Listeners
     vapi.on("call-end", onCallEnd);
@@ -166,26 +148,17 @@ export default function InterviewPage() {
  const startInterview = () => {
   if (!user?.uid) return toast.error("Please log in first.");
 
-  // LOCK the current user's ID so we have it when the call ends
-  userIdRef.current = user.uid;
-  console.log("Session started for User ID:", userIdRef.current);
-
-  hasSaved.current = false;
-  sessionAborted.current = false;
-  initialCameraState.current = cameraActive;
-
   setIsCalling(true);
   const assistantId = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID || "";
-  const name = userData?.name?.split(" ")[0] || "Candidate";
 
   vapi.start(assistantId, {
-    firstMessage: `Hello ${name}, I am your AI interviewer. Let's begin the session.`,
-    // THIS LINE IS THE FIX: It sends your UID to the Vapi Tool
+    // This injects the real UID into the Tool call
     variableValues: {
       userId: user.uid,
     },
   });
-};
+}; 
+
   const endInterview = () => {
     setIsEnding(true);
     vapi.stop();
