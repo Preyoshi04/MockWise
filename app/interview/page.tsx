@@ -62,6 +62,8 @@ export default function InterviewPage() {
   const hasSaved = useRef(false);
   const initialCameraState = useRef<boolean | null>(null);
 
+  const userIdRef = useRef<string | null>(null);
+
   // --- 1. Camera Logic (With Manipulation Detection) ---
   const toggleCamera = async () => {
     // If the user tries to toggle camera while calling, they are manipulating the session
@@ -103,48 +105,48 @@ export default function InterviewPage() {
   // --- 2. The Core Interview Logic (Vapi Listeners) ---
   useEffect(() => {
     const onCallEnd = async (vapiEvent?: any) => {
-      setIsCalling(false);
-      setIsAssistantTalking(false);
-      setIsEnding(false);
-      stopCamera();
+  setIsCalling(false);
+  setIsAssistantTalking(false);
+  setIsEnding(false);
+  stopCamera();
 
-      // Only proceed with saving if the session wasn't aborted by camera manipulation
-      if (sessionAborted.current) return;
+  if (sessionAborted.current) return;
 
-      // Extract the REAL call ID from Vapi
-      const callId = vapiEvent?.id || vapiEvent?.call?.id || (vapi as any).getCall?.()?.id;
+  const callId = vapiEvent?.id || vapiEvent?.call?.id || (vapi as any).getCall?.()?.id;
 
-      // GUARD: Only save if we have a real User, a real Call ID, and haven't saved yet
-      if (user?.uid && callId && !hasSaved.current) {
-        hasSaved.current = true;
-        
-        try {
-          // Increment total interviews in user profile
-          const userRef = doc(db, "users", user.uid);
-          await updateDoc(userRef, { totalInterviews: increment(1) });
+  const vapiScore = vapiEvent?.analysis?.score || 0; 
+  const feedbackFromVapi = vapiEvent?.analysis?.summary || "Analysis is being processed.";
 
-          // Create the interview record using real userData instead of dummy "General"
-          await addDoc(collection(db, "interviews"), {
-            userId: user.uid,
-            callId: callId,
-            createdAt: serverTimestamp(),
-            techStack: userData?.techStack || "Technical Assessment",
-            role: userData?.role || "Candidate",
-            level: userData?.level || "Standard",
-            // Placeholder scores/feedback until your backend analyzer updates this specific doc later
-            score: Math.floor(Math.random() * 20) + 70,
-            feedback: "Detailed AI analysis is being generated...",
-            status: "Completed"
-          });
+  // USE THE REF HERE: it's more stable than the state during unmounting
+  const currentUid = userIdRef.current;
 
-          toast.success("Interview Successfully Recorded");
-          setTimeout(() => router.push("/dashboard"), 1500);
-        } catch (error) {
-          console.error("Database Save Error:", error);
-          hasSaved.current = false;
-        }
-      }
-    };
+  if (currentUid && callId && !hasSaved.current) {
+    hasSaved.current = true;
+    
+    try {
+      // 1. Update the session count in the USERS collection
+      const userRef = doc(db, "users", currentUid);
+      await updateDoc(userRef, { 
+        totalInterviews: increment(1) 
+      });
+
+     await addDoc(collection(db, "interviews"), {
+  userId: userIdRef.current,        // Your real ID (e.g., "preyoshi")
+  role: userData?.role || "Developer", 
+  techStack: userData?.techStack || "Java DSA",
+  feedback: feedbackFromVapi || "Great session! Analysis is being processed.",
+  createdAt: serverTimestamp(),     // Generates the 8 January 2026 timestamp
+  score: vapiScore || 0,            // The actual score from the assistant
+  status: "Completed"
+});
+      toast.success("Interview Recorded!");
+      setTimeout(() => router.push("/dashboard"), 1500);
+    } catch (error) {
+      console.error("Database Save Error:", error);
+      hasSaved.current = false;
+    }
+  }
+};
 
     // Attach Vapi Event Listeners
     vapi.on("call-end", onCallEnd);
@@ -165,11 +167,15 @@ export default function InterviewPage() {
   }, [user, userData, router]);
 
   // --- 3. Interview Controls ---
-  const startInterview = () => {
-    if (!user?.uid) return toast.error("Please log in first.");
-    
-    // Lock the session
-    hasSaved.current = false;
+ const startInterview = () => {
+  if (!user?.uid) return toast.error("Please log in first.");
+  
+  // LOCK the current user's ID so we have it when the call ends
+  userIdRef.current = user.uid; 
+  console.log("Session started for User ID:", userIdRef.current);
+
+  hasSaved.current = false;
+  sessionAborted.current = false;
     sessionAborted.current = false;
     initialCameraState.current = cameraActive;
     

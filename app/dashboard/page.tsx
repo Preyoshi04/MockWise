@@ -70,13 +70,15 @@ export default function Dashboard() {
   
   try {
     // 1. User's Genuine Interviews
-    const userInterviewsQuery = query(
-      collection(db, "interviews"),
-      where("userId", "==", user.uid),
-      where("techStack", "!=", "General"), // Filters out dummy data
-      orderBy("techStack"),
-      orderBy("createdAt", "desc")
-    );
+    // inside dashboard/page.tsx
+const userInterviewsQuery = query(
+  collection(db, "interviews"),
+  where("userId", "==", user.uid),
+  where("techStack", "!=", "General"), 
+  orderBy("techStack"),
+  orderBy("role"),      // Added this to match your new index requirement
+  orderBy("createdAt", "desc")
+);
 
     const uSnapshot = await getDocs(userInterviewsQuery);
     const userDocs = uSnapshot.docs.map((doc) => ({
