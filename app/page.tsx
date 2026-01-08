@@ -55,7 +55,7 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative z-10 flex flex-col items-center justify-center text-center pt-32 pb-20 px-4 max-w-5xl mx-auto">
+     <section className="relative z-10 flex flex-col items-center justify-center text-center pt-10 md:pt-24 pb-20 px-4 max-w-5xl mx-auto">
         <Badge variant="outline" className="mb-6 border-zinc-800 text-zinc-400 py-1 px-4 gap-2 rounded-full animate-fade-in">
           <Sparkles size={14} className="text-indigo-400" /> Powered by <b>VAPI</b>
         </Badge>
