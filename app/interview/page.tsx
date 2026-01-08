@@ -168,149 +168,147 @@ export default function InterviewPage() {
     setIsEnding(true);
     vapi.stop();
   };
+return (
+    <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-between p-4 md:p-12 overflow-x-hidden">
+      <Toaster position="top-center" richColors theme="dark" />
 
-  return (
-    <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-between p-6 md:p-12 overflow-hidden">
-      <Toaster position="top-center" richColors theme="dark" />
+      {/* --- Aborted Modal --- */}
+      <Dialog open={showAbortedModal} onOpenChange={setShowAbortedModal}>
+        <DialogContent className="bg-zinc-950 border-zinc-800 text-white rounded-[2rem] w-[90vw] max-w-lg">
+          <DialogHeader className="flex flex-col items-center gap-4">
+            <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
+              <AlertTriangle className="text-red-500" size={32} />
+            </div>
+            <DialogTitle className="text-xl md:text-2xl font-bold text-center">
+              Session Terminated
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400 text-center text-sm md:text-base">
+              Camera state manipulation detected. The interview session has been
+              cancelled to ensure integrity.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <Button
+              onClick={() => router.push("/dashboard")}
+              className="w-full bg-white text-black font-bold h-12 rounded-xl hover:bg-slate-500 hover:text-black transition-all cursor-pointer"
+            >
+              Back to Dashboard
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {/* --- Aborted Modal --- */}
-      <Dialog open={showAbortedModal} onOpenChange={setShowAbortedModal}>
-        <DialogContent className="bg-zinc-950 border-zinc-800 text-white rounded-[2rem]">
-          <DialogHeader className="flex flex-col items-center gap-4">
-            <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
-              <AlertTriangle className="text-red-500" size={32} />
-            </div>
-            <DialogTitle className="text-2xl font-bold">
-              Session Terminated
-            </DialogTitle>
-            <DialogDescription className="text-zinc-400 text-center text-base">
-              Camera state manipulation detected. The interview session has been
-              cancelled to ensure integrity.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="mt-4">
-            <Button
-              onClick={() => router.push("/dashboard")}
-              className="w-full bg-white text-black font-bold h-12 rounded-xl"
-            >
-              Back to Dashboard
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* --- Header --- */}
+      <div className="w-full max-w-5xl flex justify-between items-center z-10 mb-4">
+        <Button
+          variant="ghost"
+          onClick={() => router.back()}
+          className="text-zinc-500 hover:text-white px-2 md:px-4"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" /> <span className="hidden xs:inline">Exit Room</span>
+        </Button>
+        <div className="flex gap-2 md:gap-4">
+          <Badge variant="outline" className="border-zinc-800 text-zinc-500 text-[10px] md:text-xs">
+            <ShieldCheck size={12} className="text-emerald-500 mr-1" /> Secure
+          </Badge>
+          {isCalling && (
+            <Badge className="bg-red-500/10 text-red-500 border-red-500/20 animate-pulse text-[10px] md:text-xs">
+              <CircleDot size={12} className="mr-1" /> LIVE
+            </Badge>
+          )}
+        </div>
+      </div>
 
-      {/* --- Header --- */}
-      <div className="w-full max-w-5xl flex justify-between items-center z-10">
-        <Button
-          variant="ghost"
-          onClick={() => router.back()}
-          className="text-zinc-500 hover:text-white"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" /> Exit Room
-        </Button>
-        <div className="flex gap-4">
-          <Badge variant="outline" className="border-zinc-800 text-zinc-500">
-            <ShieldCheck size={12} className="text-emerald-500 mr-1" /> Secure
-            Session
-          </Badge>
-          {isCalling && (
-            <Badge className="bg-red-500/10 text-red-500 border-red-500/20 animate-pulse">
-              <CircleDot size={12} className="mr-1" /> LIVE
-            </Badge>
-          )}
-        </div>
-      </div>
+      {/* --- UI Visuals (Logo/Camera) --- */}
+      <div className="relative flex flex-col items-center justify-center z-10 w-full flex-1 gap-6 md:gap-12">
+        <div className="flex flex-col items-center gap-8 md:flex-row md:gap-12 w-full justify-center">
+          {/* AI Interface Circle */}
+          <div className="relative">
+            {isCalling && (
+              <div
+                className={`absolute inset-0 rounded-full border border-indigo-500/30 animate-ping ${
+                  isAssistantTalking ? "opacity-100" : "opacity-0"
+                }`}
+              />
+            )}
+            <div
+              className={`w-32 h-32 md:w-64 md:h-64 rounded-full border-2 flex items-center justify-center transition-all duration-700 ${
+                isCalling
+                  ? "border-indigo-500 bg-indigo-500/5 shadow-[0_0_30px_rgba(99,102,241,0.15)] md:shadow-[0_0_50px_rgba(99,102,241,0.2)]"
+                  : "border-zinc-800"
+              }`}
+            >
+              <Mic
+                className={`h-8 w-8 md:h-12 md:w-12 transition-colors duration-500 ${
+                  isCalling ? "text-indigo-500" : "text-zinc-700"
+                }`}
+              />
+            </div>
+          </div>
 
-      {/* --- UI Visuals (Logo/Camera) --- */}
-      <div className="relative flex flex-col items-center justify-center z-10 w-full flex-1">
-        <div className="flex flex-col md:flex-row items-center gap-12">
-          {/* AI Interface Circle */}
-          <div className="relative">
-            {isCalling && (
-              <div
-                className={`absolute inset-0 rounded-full border border-indigo-500/30 animate-ping ${
-                  isAssistantTalking ? "opacity-100" : "opacity-0"
-                }`}
-              />
-            )}
-            <div
-              className={`w-40 h-40 md:w-64 md:h-64 rounded-full border-2 flex items-center justify-center transition-all duration-700 ${
-                isCalling
-                  ? "border-indigo-500 bg-indigo-500/5 shadow-[0_0_50px_rgba(99,102,241,0.2)]"
-                  : "border-zinc-800"
-              }`}
-            >
-              <Mic
-                className={`h-12 w-12 ${
-                  isCalling ? "text-indigo-500" : "text-zinc-700"
-                }`}
-              />
-            </div>
-          </div>
+          {/* User Camera Preview */}
+          <div
+            className={`relative transition-all duration-700 ease-in-out ${
+              cameraActive
+                ? "opacity-100 w-full max-w-[280px] md:max-w-none md:w-80 h-48 md:h-60"
+                : "opacity-0 w-0 h-0 overflow-hidden"
+            }`}
+          >
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover rounded-[1.5rem] md:rounded-[2.5rem] border-2 border-zinc-800 bg-zinc-900 shadow-2xl"
+            />
+          </div>
+        </div>
 
-          {/* User Camera Preview */}
-          <div
-            className={`relative transition-all duration-700 ${
-              cameraActive
-                ? "opacity-100 w-80 h-60"
-                : "opacity-0 w-0 h-0 overflow-hidden"
-            }`}
-          >
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-cover rounded-[2.5rem] border-2 border-zinc-800 bg-zinc-900"
-            />
-          </div>
-        </div>
+        {/* --- TRANSCRIPTION AREA --- */}
+        <div
+          className={`transition-all duration-500 w-full max-w-xl text-center px-2 ${
+            isCalling ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+          }`}
+        >
+          <div className="bg-zinc-900/40 border border-zinc-800/50 backdrop-blur-md p-4 md:p-6 rounded-[1.5rem] md:rounded-[2rem]">
+            <p className="text-sm md:text-lg text-zinc-300 italic leading-relaxed line-clamp-3 md:line-clamp-none">
+              {transcript || "The AI is listening..."}
+            </p>
+          </div>
+        </div>
+      </div>
 
-        {/* --- TRANSCRIPTION AREA --- */}
-        <div
-          className={`mt-12 transition-all duration-500 w-full max-w-xl text-center min-h-[100px] ${
-            isCalling ? "opacity-100" : "opacity-0"
-          }`}
-        >
-          <div className="bg-zinc-900/40 border border-zinc-800/50 backdrop-blur-md p-6 rounded-[2rem]">
-            <p className="text-lg text-zinc-300 italic leading-relaxed">
-              {transcript || "The AI is listening..."}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* --- Footer Controls --- */}
-      <div className="w-full max-w-md flex flex-col gap-4 pb-10 z-10">
-        <div className="flex gap-3">
-          <Button
-            onClick={toggleCamera}
-            className={`flex-1 h-14 rounded-2xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 ${
-              cameraActive
-                ? "text-indigo-400 border-indigo-500/30"
-                : "text-zinc-500"
-            }`}
-          >
-            {cameraActive ? <Video size={20} /> : <VideoOff size={20} />}
-          </Button>
-          <Button
-            disabled={isEnding}
-            onClick={isCalling ? endInterview : startInterview}
-            className={`flex-[3] h-14 rounded-2xl font-bold transition-all ${
-              isCalling
-                ? "bg-red-600 hover:bg-red-700 text-white"
-                : "bg-white text-black hover:bg-zinc-200"
-            }`}
-          >
-            {isEnding
-              ? "PROCESSING..."
-              : isCalling
-              ? "END INTERVIEW"
-              : "START INTERVIEW"}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
+      {/* --- Footer Controls --- */}
+      <div className="w-full max-w-md flex flex-col gap-4 py-6 md:pb-10 z-10">
+        <div className="flex gap-3 px-2">
+          <Button
+            onClick={toggleCamera}
+            className={`w-14 md:flex-1 h-14 rounded-2xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 transition-all ${
+              cameraActive
+                ? "text-indigo-400 border-indigo-500/30"
+                : "text-zinc-500"
+            }`}
+          >
+            {cameraActive ? <Video size={20} /> : <VideoOff size={20} />}
+          </Button>
+          <Button
+            disabled={isEnding}
+            onClick={isCalling ? endInterview : startInterview}
+            className={`flex-1 h-14 rounded-2xl font-bold transition-all text-sm md:text-base ${
+              isCalling
+                ? "bg-red-600 hover:bg-red-700 text-white"
+                : "bg-white text-black hover:bg-zinc-200"
+            }`}
+          >
+            {isEnding
+              ? "PROCESSING..."
+              : isCalling
+              ? "END INTERVIEW"
+              : "START INTERVIEW"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 }
 

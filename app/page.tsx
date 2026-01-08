@@ -16,31 +16,41 @@ export default function LandingPage() {
       </div>
 
       {/* Navigation */}
-      <nav className="relative z-50 flex justify-between items-center p-6 max-w-7xl mx-auto border-b border-white/5 backdrop-blur-md">
-        <div className="flex items-center gap-2">
-           <SparklesIcon size={30} />
-           <h1 className="text-4xl font-bold tracking-tighter italic">MockWise</h1>
-        </div>
-        
-        <div className="flex items-center gap-6">
-          {user ? (
-            <Link href="/dashboard">
-              <Button variant="outline" className="bg-slate-900 text-white hover:bg-slate-600 hover:text-white cursor-pointer rounded-full px-6 text-lg">
-                Go to Dashboard
-              </Button>
-            </Link>
-          ) : (
-            <>
-              <Link href="/auth/login" className="text-lg font-medium text-zinc-400 hover:text-white transition-colors">
-                Login
-              </Link>
-              <Link href="/auth/register">
-                <Button className="bg-white text-black hover:bg-zinc-200 rounded-full px-6 font-bold">
-                  Sign Up
+      <nav className="relative z-50 border-b border-white/5 backdrop-blur-md">
+        <div className="flex justify-between items-center p-4 md:p-6 max-w-7xl mx-auto">
+
+          {/* Left Side: Logo */}
+          <div className="flex items-center gap-2 shrink-0">
+            <SparklesIcon size={24} className="md:w-[30px] md:h-[30px] text-white" />
+            <h1 className="text-xl md:text-4xl font-bold tracking-tighter italic text-white">
+              MockWise
+            </h1>
+          </div>
+
+          {/* Right Side: Actions */}
+          <div className="flex items-center gap-3 md:gap-6 ml-4">
+            {user ? (
+              <Link href="/dashboard">
+                <Button variant="outline" className="bg-slate-900 text-white border-slate-700 rounded-full px-4 h-9 text-xs md:text-lg">
+                  Dashboard
                 </Button>
               </Link>
-            </>
-          )}
+            ) : (
+              <>
+                <Link
+                  href="/auth/login"
+                  className="text-xs md:text-lg font-medium text-zinc-400 hover:text-white transition-colors whitespace-nowrap"
+                >
+                  Login
+                </Link>
+                <Link href="/auth/register">
+                  <Button className="bg-white text-black hover:bg-zinc-200 rounded-full px-4 h-9 text-xs font-bold">
+                    Sign Up
+                  </Button>
+                </Link>
+              </>
+            )}
+          </div>
         </div>
       </nav>
 

@@ -128,7 +128,7 @@ export default function ProfilePage() {
             <CardContent className="p-8 relative">
               <BarChart3 className="absolute -right-4 -bottom-4 size-24 text-white/5 group-hover:text-indigo-500/10 transition-colors" />
               <p className="text-xs font-bold text-zinc-500 uppercase tracking-[0.2em] mb-1">Activity</p>
-              <h3 className="text-5xl font-black italic">{userData?.totalInterviews || 0}</h3>
+              <h3 className="text-5xl text-slate-500 italic">{userData?.totalInterviews || 0}</h3>
               <p className="text-zinc-400 text-sm mt-2">Total Interviews Conducted</p>
             </CardContent>
           </Card>
