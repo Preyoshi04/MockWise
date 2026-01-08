@@ -25,6 +25,7 @@ import {
   CircleDot, ArrowLeft, Video, VideoOff, Loader2, AlertTriangle 
 } from "lucide-react";
 
+// Move Vapi instance outside or use useMemo to prevent re-initialization
 const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY || "");
 
 export default function InterviewPage() {
@@ -41,20 +42,17 @@ export default function InterviewPage() {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isEnding, setIsEnding] = useState(false);
   
-  // Modal State
+  // Modal & Logic Refs
   const [showAbortedModal, setShowAbortedModal] = useState(false);
   const manipulationRef = useRef(false);
+  const hasSaved = useRef(false); // CRITICAL: Prevents duplicate entries
 
   const toggleCamera = async () => {
     if (isCalling) {
       manipulationRef.current = true;
       vapi.stop(); 
-      
       setShowAbortedModal(true);
-
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
+      if (stream) stream.getTracks().forEach(track => track.stop());
       setStream(null);
       setCameraActive(false);
       return;
@@ -77,7 +75,8 @@ export default function InterviewPage() {
   };
 
   useEffect(() => {
-    vapi.on("call-end", async () => {
+    // 1. Define the handler separately so we can remove it specifically
+    const onCallEnd = async () => {
       setIsCalling(false);
       setIsAssistantTalking(false);
       setTranscript("");
@@ -85,43 +84,45 @@ export default function InterviewPage() {
       
       if (stream) stream.getTracks().forEach(track => track.stop());
       
-      if (!manipulationRef.current && user?.uid) {
+      // 2. THE GATEKEEPER: Check lock, manipulation, and user
+      if (!manipulationRef.current && user?.uid && !hasSaved.current) {
+        hasSaved.current = true; // Lock immediately
+        
         try {
-          // 1. UPDATE TOTAL COUNT IN USER PROFILE
           const userRef = doc(db, "users", user.uid);
           await updateDoc(userRef, { totalInterviews: increment(1) });
 
-          // 2. CREATE THE INTERVIEW RECORD (THE CARD)
           await addDoc(collection(db, "interviews"), {
             userId: user.uid,
             createdAt: serverTimestamp(),
-            score: Math.floor(Math.random() * 15) + 75, // Placeholder score
+            score: Math.floor(Math.random() * 15) + 75,
             techStack: userData?.techStack || "General",
             feedback: "Great session! Your communication skills are strong. Analysis is being processed.",
             status: "Completed"
           });
           
-          toast.success("Interview Completed", { 
-            description: "Session recorded successfully." 
-          });
-          
+          toast.success("Interview Completed");
           setTimeout(() => router.push("/dashboard"), 2000);
         } catch (err) {
-          console.error("DB Update failed:", err);
+          console.error("DB Error:", err);
+          hasSaved.current = false; // Only unlock if save failed
         }
       }
-    });
+    };
 
+    // 3. Attach listeners
+    vapi.on("call-end", onCallEnd);
     vapi.on("speech-start", () => setIsAssistantTalking(true));
     vapi.on("speech-end", () => setIsAssistantTalking(false));
-
-    vapi.on("message", (message) => {
-      if (message.type === "transcript" && message.transcriptType === "partial") {
-        setTranscript(message.transcript);
+    vapi.on("message", (msg: any) => {
+      if (msg.type === "transcript" && msg.transcriptType === "partial") {
+        setTranscript(msg.transcript);
       }
     });
 
+    // 4. CLEANUP: Remove specifically these listeners to prevent duplicates
     return () => { 
+      vapi.off("call-end", onCallEnd);
       vapi.stop(); 
       if (stream) stream.getTracks().forEach(track => track.stop());
     };
@@ -129,12 +130,13 @@ export default function InterviewPage() {
 
   const startInterview = () => {
     if (!user?.uid) return;
+    hasSaved.current = false; // Reset for new session
     manipulationRef.current = false;
     setIsCalling(true);
     const assistantIdentifier = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID || "";
     const firstName = userData?.name?.split(" ")[0] || "there";
     vapi.start(assistantIdentifier, {
-      firstMessage: `Hello ${firstName}, I am your AI interviewer today. I've reviewed your profile and I'm ready to begin. How are you doing today?`,
+      firstMessage: `Hello ${firstName}, I am your AI interviewer today. How are you doing?`,
     });
   };
 
@@ -156,14 +158,11 @@ export default function InterviewPage() {
             </div>
             <DialogTitle className="text-2xl font-bold text-center">Interview Terminated</DialogTitle>
             <DialogDescription className="text-zinc-400 text-center text-base">
-              You manipulated your camera state during the live session. For security and fairness, the interview has been cancelled and will not be recorded.
+              You manipulated your camera state during the live session. The interview has been cancelled.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="mt-4">
-            <Button 
-              onClick={() => router.push("/dashboard")}
-              className="w-full bg-white text-black hover:bg-zinc-200 font-bold h-12 rounded-xl"
-            >
+            <Button onClick={() => router.push("/dashboard")} className="w-full bg-white text-black font-bold h-12 rounded-xl">
               Return to Dashboard
             </Button>
           </DialogFooter>
@@ -173,16 +172,16 @@ export default function InterviewPage() {
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] md:w-[600px] h-[300px] md:h-[600px] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="w-full max-w-5xl flex justify-between items-center z-10">
-        <Button variant="ghost" onClick={() => router.back()} className="text-zinc-500 hover:text-white transition-colors h-9">
+        <Button variant="ghost" onClick={() => router.back()} className="text-zinc-500 hover:text-white h-9">
           <ArrowLeft className="mr-2 h-4 w-4" /> Exit Room
         </Button>
         <div className="flex items-center gap-4">
-          <Badge variant="outline" className="border-zinc-800 text-zinc-500 gap-1.5 px-3 py-1">
-            <ShieldCheck size={12} className="text-emerald-500" /> Secure
+          <Badge variant="outline" className="border-zinc-800 text-zinc-500 px-3 py-1">
+            <ShieldCheck size={12} className="text-emerald-500 mr-1" /> Secure
           </Badge>
           {isCalling && (
-            <Badge className="bg-red-500/10 text-red-500 border-red-500/20 animate-pulse gap-1.5 px-3 py-1">
-              <CircleDot size={12} /> LIVE
+            <Badge className="bg-red-500/10 text-red-500 border-red-500/20 animate-pulse px-3 py-1">
+              <CircleDot size={12} className="mr-1" /> LIVE
             </Badge>
           )}
         </div>
@@ -215,13 +214,13 @@ export default function InterviewPage() {
 
       <div className="w-full max-w-md flex flex-col gap-4 pb-6 z-10">
         <div className="flex gap-3">
-          <Button onClick={toggleCamera} className={`flex-1 h-14 rounded-2xl bg-slate-800 border-zinc-800 cursor-pointer ${cameraActive ? 'bg-zinc-800 text-white' : ''}`}>
+          <Button onClick={toggleCamera} className={`flex-1 h-14 rounded-2xl bg-slate-800 border-zinc-800 ${cameraActive ? 'bg-zinc-800 text-white' : ''}`}>
             {cameraActive ? <Video size={18} /> : <VideoOff size={18} />}
           </Button>
           <Button 
             disabled={isEnding}
             onClick={isCalling ? endInterview : startInterview}
-            className={`flex-[3] h-14 rounded-2xl cursor-pointer font-bold ${isCalling ? 'bg-red-600' : 'bg-slate-500 text-black hover:bg-slate-800 hover:text-white'}`}
+            className={`flex-[3] h-14 rounded-2xl font-bold ${isCalling ? 'bg-red-600' : 'bg-slate-500 text-black hover:bg-slate-800 hover:text-white'}`}
           >
             {isEnding ? "ANALYZING..." : (isCalling ? "END INTERVIEW" : "START INTERVIEW")}
           </Button>
