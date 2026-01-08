@@ -112,57 +112,38 @@ export default function InterviewPage() {
   useEffect(() => {
     const onCallEnd = async (vapiEvent?: any) => {
   setIsCalling(false);
-  setIsAssistantTalking(false);
-  setIsEnding(false);
   stopCamera();
 
   if (sessionAborted.current) return;
 
-  // 1. Get the Call ID from Vapi
-  const callId = vapiEvent?.id || vapiEvent?.call?.id || (vapi as any).getCall?.()?.id;
+  // 1. Get the data from the event (fixes red squiggles)
+  const vapiScore = vapiEvent?.analysis?.score || 0;
+  const feedbackText = vapiEvent?.analysis?.summary || "No feedback generated.";
+  const callId = vapiEvent?.id || "manual-id";
+  const currentUid = user?.uid;
 
-  // 2. DEFINE the missing variables (Fixes the red squiggles)
-  const vapiScore = vapiEvent?.analysis?.score || Math.floor(Math.random() * 20) + 75;
-  const feedbackText = vapiEvent?.analysis?.summary || "Interview completed successfully.";
-
-  // 3. Get the REAL User UID (Not the username)
-  const currentUid = user?.uid; // Use the direct auth UID
-
-  if (currentUid && callId && !hasSaved.current) {
+  if (currentUid && !hasSaved.current) {
     hasSaved.current = true;
-    
     try {
-      console.log("Saving to DB for UID:", currentUid);
-
-      // Update Session Count
-      const userRef = doc(db, "users", currentUid);
-      await updateDoc(userRef, { 
-        totalInterviews: increment(1) 
-      });
-
-      // Save the Interview Record
+      // 2. Save using the EXACT fields your index expects
       await addDoc(collection(db, "interviews"), {
-        userId: currentUid,        // Saves "xLHjW..." not "Preo"
-        role: userData?.role || "Software Engineer", 
+        userId: currentUid,
+        role: userData?.role || "Software Engineer",
         techStack: userData?.techStack || "Java",
         feedback: feedbackText,
-        createdAt: serverTimestamp(),
         score: vapiScore,
+        createdAt: serverTimestamp(),
         status: "Completed",
-        callId: callId
       });
 
-      toast.success("Interview Recorded!");
-      setTimeout(() => router.push("/dashboard"), 1500);
+      toast.success("Interview Saved!");
+      router.push("/dashboard");
     } catch (error) {
-      console.error("FIREBASE ERROR:", error);
-      hasSaved.current = false; // Allow retry if it failed
+      console.error("Save Error:", error);
+      hasSaved.current = false;
     }
-  } else {
-    console.error("Save blocked: Missing UID or CallID", { currentUid, callId });
   }
 };
-
     // Attach Vapi Event Listeners
     vapi.on("call-end", onCallEnd);
     vapi.on("speech-start", () => setIsAssistantTalking(true));
@@ -182,27 +163,29 @@ export default function InterviewPage() {
   }, [user, userData, router]);
 
   // --- 3. Interview Controls ---
-  const startInterview = () => {
-    if (!user?.uid) return toast.error("Please log in first.");
+ const startInterview = () => {
+  if (!user?.uid) return toast.error("Please log in first.");
 
-    // LOCK the current user's ID so we have it when the call ends
-    userIdRef.current = user.uid;
-    console.log("Session started for User ID:", userIdRef.current);
+  // LOCK the current user's ID so we have it when the call ends
+  userIdRef.current = user.uid;
+  console.log("Session started for User ID:", userIdRef.current);
 
-    hasSaved.current = false;
-    sessionAborted.current = false;
-    sessionAborted.current = false;
-    initialCameraState.current = cameraActive;
+  hasSaved.current = false;
+  sessionAborted.current = false;
+  initialCameraState.current = cameraActive;
 
-    setIsCalling(true);
-    const assistantId = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID || "";
-    const name = userData?.name?.split(" ")[0] || "Candidate";
+  setIsCalling(true);
+  const assistantId = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID || "";
+  const name = userData?.name?.split(" ")[0] || "Candidate";
 
-    vapi.start(assistantId, {
-      firstMessage: `Hello ${name}, I am your AI interviewer. Let's begin the session.`,
-    });
-  };
-
+  vapi.start(assistantId, {
+    firstMessage: `Hello ${name}, I am your AI interviewer. Let's begin the session.`,
+    // THIS LINE IS THE FIX: It sends your UID to the Vapi Tool
+    variableValues: {
+      userId: user.uid,
+    },
+  });
+};
   const endInterview = () => {
     setIsEnding(true);
     vapi.stop();
