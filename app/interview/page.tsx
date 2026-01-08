@@ -1,18 +1,26 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
+
 import { useEffect, useState, useRef } from "react";
 import Vapi from "@vapi-ai/web";
 import { useAuth } from "@/context/AuthContext";
-import { useUser } from "@/hooks/use-user"; 
+import { useUser } from "@/hooks/use-user";
 import { useRouter } from "next/navigation";
 import { toast, Toaster } from "sonner";
-import { db } from "@/lib/firebase"; 
-import { doc, updateDoc, increment, addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { 
+  doc, 
+  updateDoc, 
+  increment, 
+  addDoc, 
+  collection, 
+  serverTimestamp 
+} from "firebase/firestore";
 
-// Shadcn + Lucide
+// Shadcn + Lucide Components
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -20,20 +28,27 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { 
-  Mic, MicOff, PhoneOff, Waves, ShieldCheck, 
-  CircleDot, ArrowLeft, Video, VideoOff, Loader2, AlertTriangle 
+import {
+  Mic,
+  MicOff,
+  ShieldCheck,
+  CircleDot,
+  ArrowLeft,
+  Video,
+  VideoOff,
+  AlertTriangle,
 } from "lucide-react";
 
+// Initialize Vapi once
 const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY || "");
 
 export default function InterviewPage() {
   const { user } = useAuth();
-  const { userData } = useUser(); 
+  const { userData } = useUser();
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // States
+  // --- States ---
   const [isCalling, setIsCalling] = useState(false);
   const [isAssistantTalking, setIsAssistantTalking] = useState(false);
   const [transcript, setTranscript] = useState("");
@@ -41,30 +56,22 @@ export default function InterviewPage() {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isEnding, setIsEnding] = useState(false);
   
-  // Modal & Logic Refs
+  // --- Modals & Guard Refs ---
   const [showAbortedModal, setShowAbortedModal] = useState(false);
-  const manipulationRef = useRef(false);
-  const hasSaved = useRef(false); // CRITICAL: Prevents double-entry in DB
+  const sessionAborted = useRef(false);
+  const hasSaved = useRef(false);
+  const initialCameraState = useRef<boolean | null>(null);
 
+  // --- 1. Camera Logic (With Manipulation Detection) ---
   const toggleCamera = async () => {
+    // If the user tries to toggle camera while calling, they are manipulating the session
     if (isCalling) {
-      // If they change camera during a call, we treat it as manipulation
-      manipulationRef.current = true;
-      vapi.stop(); 
-      setShowAbortedModal(true);
-
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-      setStream(null);
-      setCameraActive(false);
+      handleManipulation();
       return;
     }
 
     if (cameraActive) {
-      if (stream) stream.getTracks().forEach(track => track.stop());
-      setStream(null);
-      setCameraActive(false);
+      stopCamera();
     } else {
       try {
         const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -72,178 +79,196 @@ export default function InterviewPage() {
         if (videoRef.current) videoRef.current.srcObject = mediaStream;
         setCameraActive(true);
       } catch (err) {
-        toast.error("Camera Error", { description: "Could not access camera." });
+        toast.error("Camera Error", { description: "Please enable camera access." });
       }
     }
   };
 
-  useEffect(() => {
-    // Define the call-end handler separately so it can be removed
-    // Replace your onCallEnd inside the useEffect with this:
-const onCallEnd = async (vapiEvent?: any) => {
-  setIsCalling(false);
-  setIsAssistantTalking(false);
-  setTranscript("");
-  setIsEnding(false);
-  
-  if (stream) stream.getTracks().forEach(track => track.stop());
-
-  // 1. STRENEOUS CALL ID CHECK
-  const actualCallId = vapiEvent?.id || vapiEvent?.call?.id || (vapi as any).getCall?.()?.id;
-
-  // 2. THE ULTIMATE GATEKEEPER
-  // We ONLY save if:
-  // - It's not a manual manipulation (camera toggle)
-  // - We have a valid user UID
-  // - We have a valid Call ID from Vapi
-  // - We haven't saved already
-  // - AND CRITICALLY: We have actual userData (Role/TechStack)
-  const isDataValid = userData?.techStack && userData?.techStack !== "General";
-
-  if (!manipulationRef.current && user?.uid && actualCallId && !hasSaved.current && isDataValid) {
-    hasSaved.current = true; 
-    
-    try {
-      const userRef = doc(db, "users", user.uid);
-      await updateDoc(userRef, { totalInterviews: increment(1) });
-
-      await addDoc(collection(db, "interviews"), {
-        userId: user.uid,
-        callId: actualCallId, 
-        createdAt: serverTimestamp(),
-        // No more fallbacks to "General"
-        techStack: userData.techStack, 
-        role: userData.role || "Developer",
-        level: userData.level || "Junior",
-        score: Math.floor(Math.random() * 15) + 75,
-        feedback: "Session recorded successfully. Analysis is processing.",
-        status: "Completed"
-      });
-      
-      toast.success("Genuine Interview Recorded!");
-      setTimeout(() => router.push("/dashboard"), 2000);
-    } catch (err) {
-      console.error("DB Error:", err);
-      hasSaved.current = false; 
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
     }
-  } else {
-    console.log("Save blocked: Missing CallID or genuine userData");
-  }
-};
+    setStream(null);
+    setCameraActive(false);
+  };
 
+  const handleManipulation = () => {
+    sessionAborted.current = true;
+    vapi.stop(); // Immediately end the Vapi call
+    stopCamera();
+    setShowAbortedModal(true);
+    toast.error("Session Cancelled", { description: "Camera manipulation detected." });
+  };
+
+  // --- 2. The Core Interview Logic (Vapi Listeners) ---
+  useEffect(() => {
+    const onCallEnd = async (vapiEvent?: any) => {
+      setIsCalling(false);
+      setIsAssistantTalking(false);
+      setIsEnding(false);
+      stopCamera();
+
+      // Only proceed with saving if the session wasn't aborted by camera manipulation
+      if (sessionAborted.current) return;
+
+      // Extract the REAL call ID from Vapi
+      const callId = vapiEvent?.id || vapiEvent?.call?.id || (vapi as any).getCall?.()?.id;
+
+      // GUARD: Only save if we have a real User, a real Call ID, and haven't saved yet
+      if (user?.uid && callId && !hasSaved.current) {
+        hasSaved.current = true;
+        
+        try {
+          // Increment total interviews in user profile
+          const userRef = doc(db, "users", user.uid);
+          await updateDoc(userRef, { totalInterviews: increment(1) });
+
+          // Create the interview record using real userData instead of dummy "General"
+          await addDoc(collection(db, "interviews"), {
+            userId: user.uid,
+            callId: callId,
+            createdAt: serverTimestamp(),
+            techStack: userData?.techStack || "Technical Assessment",
+            role: userData?.role || "Candidate",
+            level: userData?.level || "Standard",
+            // Placeholder scores/feedback until your backend analyzer updates this specific doc later
+            score: Math.floor(Math.random() * 20) + 70,
+            feedback: "Detailed AI analysis is being generated...",
+            status: "Completed"
+          });
+
+          toast.success("Interview Successfully Recorded");
+          setTimeout(() => router.push("/dashboard"), 1500);
+        } catch (error) {
+          console.error("Database Save Error:", error);
+          hasSaved.current = false;
+        }
+      }
+    };
+
+    // Attach Vapi Event Listeners
     vapi.on("call-end", onCallEnd);
     vapi.on("speech-start", () => setIsAssistantTalking(true));
     vapi.on("speech-end", () => setIsAssistantTalking(false));
-
-    vapi.on("message", (message) => {
-      if (message.type === "transcript" && message.transcriptType === "partial") {
-        setTranscript(message.transcript);
+    vapi.on("message", (msg: any) => {
+      if (msg.type === "transcript" && msg.transcriptType === "partial") {
+        setTranscript(msg.transcript);
       }
     });
 
-    return () => { 
-      // CLEANUP: Important to prevent memory leaks and multiple listeners
+    // Cleanup: Prevent multiple listeners from stacking
+    return () => {
       vapi.off("call-end", onCallEnd);
-      vapi.stop(); 
-      if (stream) stream.getTracks().forEach(track => track.stop());
+      vapi.stop();
+      stopCamera();
     };
-  }, [router, stream, user?.uid, userData]); 
+  }, [user, userData, router]);
 
+  // --- 3. Interview Controls ---
   const startInterview = () => {
-    if (!user?.uid) return;
-    hasSaved.current = false; // Reset lock for new interview
-    manipulationRef.current = false;
+    if (!user?.uid) return toast.error("Please log in first.");
+    
+    // Lock the session
+    hasSaved.current = false;
+    sessionAborted.current = false;
+    initialCameraState.current = cameraActive;
+    
     setIsCalling(true);
-    const assistantIdentifier = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID || "";
-    const firstName = userData?.name?.split(" ")[0] || "there";
-    vapi.start(assistantIdentifier, {
-      firstMessage: `Hello ${firstName}, I am your AI interviewer today. I've reviewed your profile and I'm ready to begin. How are you doing today?`,
+    const assistantId = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID || "";
+    const name = userData?.name?.split(" ")[0] || "Candidate";
+    
+    vapi.start(assistantId, {
+      firstMessage: `Hello ${name}, I am your AI interviewer. Let's begin the session.`,
     });
   };
 
   const endInterview = () => {
     setIsEnding(true);
-    manipulationRef.current = false; 
     vapi.stop();
   };
-  
-  return (
-    <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-between p-4 md:p-12 overflow-hidden">
-      <Toaster position="top-center" theme="dark" richColors />
 
+  return (
+    <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-between p-6 md:p-12 overflow-hidden">
+      <Toaster position="top-center" richColors theme="dark" />
+
+      {/* --- Aborted Modal --- */}
       <Dialog open={showAbortedModal} onOpenChange={setShowAbortedModal}>
         <DialogContent className="bg-zinc-950 border-zinc-800 text-white rounded-[2rem]">
           <DialogHeader className="flex flex-col items-center gap-4">
             <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
               <AlertTriangle className="text-red-500" size={32} />
             </div>
-            <DialogTitle className="text-2xl font-bold text-center">Interview Terminated</DialogTitle>
+            <DialogTitle className="text-2xl font-bold">Session Terminated</DialogTitle>
             <DialogDescription className="text-zinc-400 text-center text-base">
-              You manipulated your camera state during the live session. The interview has been cancelled.
+              Camera state manipulation detected. The interview session has been cancelled to ensure integrity.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="mt-4">
             <Button onClick={() => router.push("/dashboard")} className="w-full bg-white text-black font-bold h-12 rounded-xl">
-              Return to Dashboard
+              Back to Dashboard
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] md:w-[600px] h-[300px] md:h-[600px] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none" />
-
+      {/* --- Header --- */}
       <div className="w-full max-w-5xl flex justify-between items-center z-10">
-        <Button variant="ghost" onClick={() => router.back()} className="text-zinc-500 hover:text-white h-9">
+        <Button variant="ghost" onClick={() => router.back()} className="text-zinc-500 hover:text-white">
           <ArrowLeft className="mr-2 h-4 w-4" /> Exit Room
         </Button>
-        <div className="flex items-center gap-4">
-          <Badge variant="outline" className="border-zinc-800 text-zinc-500 px-3 py-1">
-            <ShieldCheck size={12} className="text-emerald-500 mr-1" /> Secure
+        <div className="flex gap-4">
+          <Badge variant="outline" className="border-zinc-800 text-zinc-500">
+            <ShieldCheck size={12} className="text-emerald-500 mr-1" /> Secure Session
           </Badge>
           {isCalling && (
-            <Badge className="bg-red-500/10 text-red-500 border-red-500/20 animate-pulse px-3 py-1">
+            <Badge className="bg-red-500/10 text-red-500 border-red-500/20 animate-pulse">
               <CircleDot size={12} className="mr-1" /> LIVE
             </Badge>
           )}
         </div>
       </div>
 
-      <div className="relative flex flex-col items-center justify-center z-10 w-full max-w-4xl flex-1">
-        <div className="flex flex-col md:flex-row items-center justify-center gap-12 w-full">
+      {/* --- UI Visuals (Logo/Camera) --- */}
+      <div className="relative flex flex-col items-center justify-center z-10 w-full flex-1">
+        <div className="flex flex-col md:flex-row items-center gap-12">
+          {/* AI Interface Circle */}
           <div className="relative">
             {isCalling && (
-              <div className={`absolute inset-0 rounded-full border border-indigo-500/50 animate-ping ${isAssistantTalking ? 'opacity-100' : 'opacity-0'}`} />
+              <div className={`absolute inset-0 rounded-full border border-indigo-500/30 animate-ping ${isAssistantTalking ? 'opacity-100' : 'opacity-0'}`} />
             )}
-            <div className={`w-32 h-32 md:w-64 md:h-64 rounded-full border-2 flex flex-col items-center justify-center transition-all duration-700 ${isCalling ? "border-indigo-500 bg-indigo-500/5" : "border-zinc-800"}`}>
-              {isCalling ? <Mic className="h-10 w-10 text-indigo-500" /> : <MicOff className="h-10 w-10 text-zinc-700" />}
+            <div className={`w-40 h-40 md:w-64 md:h-64 rounded-full border-2 flex items-center justify-center transition-all duration-700 ${isCalling ? "border-indigo-500 bg-indigo-500/5 shadow-[0_0_50px_rgba(99,102,241,0.2)]" : "border-zinc-800"}`}>
+              <Mic className={`h-12 w-12 ${isCalling ? "text-indigo-500" : "text-zinc-700"}`} />
             </div>
           </div>
 
+          {/* User Camera Preview */}
           <div className={`relative transition-all duration-700 ${cameraActive ? 'opacity-100 w-80 h-60' : 'opacity-0 w-0 h-0 overflow-hidden'}`}>
-            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover rounded-[2.5rem] border-2 border-zinc-800 bg-zinc-900 shadow-2xl" />
+            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover rounded-[2.5rem] border-2 border-zinc-800 bg-zinc-900" />
           </div>
         </div>
 
-        <div className={`mt-16 transition-all duration-500 w-full max-w-xl text-center ${isCalling ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="bg-zinc-900/40 border border-zinc-800/50 backdrop-blur-md p-8 rounded-[2.5rem]">
-            <p className="text-xl text-zinc-200 italic">
+        {/* --- TRANSCRIPTION AREA --- */}
+        <div className={`mt-12 transition-all duration-500 w-full max-w-xl text-center min-h-[100px] ${isCalling ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="bg-zinc-900/40 border border-zinc-800/50 backdrop-blur-md p-6 rounded-[2rem]">
+            <p className="text-lg text-zinc-300 italic leading-relaxed">
               {transcript || "The AI is listening..."}
             </p>
           </div>
         </div>
       </div>
 
-      <div className="w-full max-w-md flex flex-col gap-4 pb-6 z-10">
+      {/* --- Footer Controls --- */}
+      <div className="w-full max-w-md flex flex-col gap-4 pb-10 z-10">
         <div className="flex gap-3">
-          <Button onClick={toggleCamera} className={`flex-1 h-14 rounded-2xl bg-slate-800 border-zinc-800 ${cameraActive ? 'bg-zinc-800 text-white' : ''}`}>
-            {cameraActive ? <Video size={18} /> : <VideoOff size={18} />}
+          <Button onClick={toggleCamera} className={`flex-1 h-14 rounded-2xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 ${cameraActive ? 'text-indigo-400 border-indigo-500/30' : 'text-zinc-500'}`}>
+            {cameraActive ? <Video size={20} /> : <VideoOff size={20} />}
           </Button>
-          <Button 
+          <Button
             disabled={isEnding}
             onClick={isCalling ? endInterview : startInterview}
-            className={`flex-[3] h-14 rounded-2xl font-bold ${isCalling ? 'bg-red-600' : 'bg-slate-500 text-black hover:bg-slate-800 hover:text-white'}`}
+            className={`flex-[3] h-14 rounded-2xl font-bold transition-all ${isCalling ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-white text-black hover:bg-zinc-200'}`}
           >
-            {isEnding ? "ANALYZING..." : (isCalling ? "END INTERVIEW" : "START INTERVIEW")}
+            {isEnding ? "PROCESSING..." : (isCalling ? "END INTERVIEW" : "START INTERVIEW")}
           </Button>
         </div>
       </div>

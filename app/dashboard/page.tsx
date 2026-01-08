@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
+
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -16,6 +17,8 @@ import {
 import Link from "next/link";
 import Cookies from "js-cookie";
 import { useUser } from "@/hooks/use-user";
+
+// UI Components
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -28,10 +31,10 @@ import { Progress } from "@/components/ui/progress";
 import {
   LogOut,
   PlusCircle,
-  History,
   Trophy,
   ChevronRight,
   User,
+  History,
   Loader2,
   Globe,
   Zap,
@@ -42,7 +45,8 @@ import Image from "next/image";
 export default function Dashboard() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const { userData, loadingg } = useUser();
+  const { userData } = useUser();
+  
   const [interviews, setInterviews] = useState<any[]>([]);
   const [fetching, setFetching] = useState(true);
   const [communityStats, setCommunityStats] = useState({
@@ -51,80 +55,87 @@ export default function Dashboard() {
     globalScores: [] as number[],
   });
 
+  // --- 1. Authentication Guard ---
   useEffect(() => {
     if (!loading && !user) {
       router.replace("/auth/login");
     }
   }, [user, loading, router]);
 
+  // --- 2. Data Fetching Logic ---
   useEffect(() => {
     const fetchData = async () => {
-      if (!user) return;
-      setFetching(true);
-      try {
-        // ADD THE FIXED QUERY HERE
-    const q = query(
+  if (!user?.uid) return;
+  setFetching(true);
+  
+  try {
+    // 1. User's Genuine Interviews
+    const userInterviewsQuery = query(
       collection(db, "interviews"),
       where("userId", "==", user.uid),
-      where("techStack", "!=", "General"), // This hides the dummy cards
-      orderBy("techStack"),                // Required by Firestore for the != filter
+      where("techStack", "!=", "General"), // Filters out dummy data
+      orderBy("techStack"),
       orderBy("createdAt", "desc")
     );
-        const querySnapshot = await getDocs(q);
-        const userDocs = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setInterviews(userDocs);
 
-        const cq = query(
-          collection(db, "interviews"),
-          orderBy("createdAt", "desc"),
-          limit(200)
-        );
-        const cSnapshot = await getDocs(cq);
-        const cDocs = cSnapshot.docs.map((d) => d.data());
+    const uSnapshot = await getDocs(userInterviewsQuery);
+    const userDocs = uSnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+    setInterviews(userDocs);
 
-        if (cDocs.length > 0) {
-          const scores = cDocs.map((d: any) => Number(d.score) || 0);
-          const total = scores.reduce((acc, curr) => acc + curr, 0);
+    // 2. Community Benchmarks (Updated to handle Role)
+    const communityQuery = query(
+      collection(db, "interviews"),
+      where("techStack", "!=", "General"),
+      orderBy("techStack"),
+      limit(100)
+    );
+    
+    const cSnapshot = await getDocs(communityQuery);
+    const cDocs = cSnapshot.docs.map((d) => d.data() as any);
 
-          setCommunityStats({
-            avgScore: Math.round(total / cDocs.length),
-            topStack: (cDocs[0] as any).techStack || "Next.js",
-            globalScores: scores,
-          });
-        }
-      } catch (err: any) {
-        console.error("Data Error:", err.message);
-      } finally {
-        setFetching(false);
-      }
-    };
+    if (cDocs.length > 0) {
+      const scores = cDocs.map((d) => Number(d.score) || 0);
+      const total = scores.reduce((acc, curr) => acc + curr, 0);
+
+      // Find the most frequent Tech Stack
+      const stackCounts: Record<string, number> = {};
+      cDocs.forEach((doc) => {
+        const key = doc.techStack || "General";
+        stackCounts[key] = (stackCounts[key] || 0) + 1;
+      });
+      
+      const mostFrequentStack = Object.keys(stackCounts).reduce((a, b) => 
+        stackCounts[a] > stackCounts[b] ? a : b
+      );
+
+      setCommunityStats({
+        avgScore: Math.round(total / cDocs.length),
+        topStack: mostFrequentStack,
+        globalScores: scores,
+      });
+    }
+  } catch (err: any) {
+    console.error("Dashboard Fetch Error:", err.message);
+    // REMINDER: If the screen is blank, check the F12 console for the Firebase Index link!
+  } finally {
+    setFetching(false);
+  }
+};
+
     if (!loading && user) fetchData();
   }, [user, loading]);
 
+  // --- 3. Rank Calculation ---
   const standing = (() => {
     if (!interviews || interviews.length === 0) {
-      return {
-        label: "Not Ranked",
-        value: 0,
-        sub: "Complete a session to see rank",
-      };
+      return { label: "Not Ranked", value: 0, sub: "Complete a session to see rank" };
     }
-    const userAvg =
-      interviews.reduce((acc, curr) => acc + (Number(curr.score) || 0), 0) /
-      interviews.length;
-    if (userAvg === 0) {
-      return {
-        label: "Unranked",
-        value: 0,
-        sub: "Score above 0 to enter the leaderboards.",
-      };
-    }
-    const peopleBeaten = communityStats.globalScores.filter(
-      (score) => score < userAvg
-    ).length;
+    const userAvg = interviews.reduce((acc, curr) => acc + (Number(curr.score) || 0), 0) / interviews.length;
+    
+    const peopleBeaten = communityStats.globalScores.filter(s => s < userAvg).length;
     const totalGlobal = communityStats.globalScores.length || 1;
     const percentile = Math.round((peopleBeaten / totalGlobal) * 100);
     const topPercent = Math.max(1, 100 - percentile);
@@ -145,224 +156,167 @@ export default function Dashboard() {
       sessionStorage.clear();
       window.location.href = "/";
     } catch (error) {
-      console.error("Error signing out:", error);
+      console.error("Logout Error:", error);
     }
   };
 
   if (loading || !user) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-black text-white px-4 text-center">
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-black text-white">
         <Loader2 className="h-8 w-8 animate-spin text-zinc-500 mb-4" />
-        <p className="text-zinc-500 animate-pulse font-medium">
-          Authenticating Session...
-        </p>
+        <p className="text-zinc-500 animate-pulse font-medium">Loading Workspace...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-slate-100 font-sans">
+    <div className="min-h-screen bg-black text-slate-100 selection:bg-indigo-500/30">
       
+      {/* --- Navbar --- */}
       <header className="border-b border-slate-800 bg-black/50 backdrop-blur-md sticky top-0 z-50">
-           <div className="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
-             {/* Logo Section */}
-             <div className="flex items-center gap-2">
-               <SparklesIcon size={24} className="md:w-[30px] md:h-[30px]" />
-               <h1 className="text-xl md:text-4xl font-bold tracking-tighter italic text-white">
-                 MockWise
-               </h1>
-             </div>
-     
-             {/* Actions Section */}
-             <div className="flex items-center gap-3 md:gap-6">
-               <Link
-                 href="/dashboard/profile"
-                 className="hover:opacity-80 transition-opacity"
-               >
-                 <div className="flex items-center gap-2 text-slate-400 text-sm border-r border-slate-800 pr-4">
-                   <User size={14} className="text-slate-200" />
-                   <span className="font-medium text-slate-200 truncate max-w-[100px]">
-                     {userData?.name || "Dev"}
-                   </span>
-                 </div>
-               </Link>
-               <Button
-                 variant="ghost"
-                 onClick={handleLogout}
-                 className="text-slate-400 hover:text-red-400 hover:bg-red-500/10 gap-2 h-9 px-3"
-               >
-                 <LogOut size={16} />
-                 <span className="text-sm sm:text-xs">Sign Out</span>
-               </Button>
-             </div>
-           </div>
-         </header>
+        <div className="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <SparklesIcon size={24} className="text-indigo-500" />
+            <h1 className="text-xl md:text-2xl font-bold tracking-tighter italic text-white">MockWise</h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard/profile" className="flex items-center gap-2 text-slate-400 text-sm border-r border-slate-800 pr-4">
+              <User size={14} className="text-slate-200" />
+              <span className="font-medium text-slate-200 truncate max-w-[100px]">{userData?.name || "Dev"}</span>
+            </Link>
+            <Button variant="ghost" onClick={handleLogout} className="text-slate-400 hover:text-red-400 hover:bg-red-500/10 gap-2 h-9 px-3">
+              <LogOut size={16} />
+              <span className="hidden sm:inline">Sign Out</span>
+            </Button>
+          </div>
+        </div>
+      </header>
 
-      <main className="max-w-7xl mx-auto p-4 md:p-10 space-y-8 md:space-y-12">
-        <section className="flex flex-col lg:flex-row items-center gap-8 md:gap-10 p-6 md:p-16 bg-gradient-to-br from-slate-900 to-black rounded-[1.5rem] md:rounded-[2.5rem] border border-slate-800 relative overflow-hidden">
+      <main className="max-w-7xl mx-auto p-4 md:p-10 space-y-12">
+        
+        {/* --- Hero Section --- */}
+        <section className="flex flex-col lg:flex-row items-center gap-10 p-8 md:p-16 bg-gradient-to-br from-zinc-900 to-black rounded-[2.5rem] border border-slate-800 relative overflow-hidden">
           <div className="flex-1 text-center lg:text-left z-10">
-            <Badge className="mb-4 bg-white text-black hover:bg-slate-200 py-1 px-4 text-xs">
-              AI-Powered Analysis
+            <Badge className="mb-4 bg-indigo-500/10 text-indigo-400 border-indigo-500/20 py-1 px-4 text-xs">
+              AI-Powered Feedback
             </Badge>
-            <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-6 tracking-tight text-white leading-tight">
-              Ready to land your <br />
-              <span className="text-slate-500 italic font-serif">
-                dream job?
+            <h2 className="text-3xl md:text-6xl font-bold mb-6 tracking-tight text-white leading-tight">
+              Master your next <br />
+              <span className="text-zinc-500 italic font-serif underline decoration-zinc-800 underline-offset-8">
+                tech interview.
               </span>
             </h2>
             <Button
               size="lg"
               onClick={() => router.push("/interview")}
-              className="w-full sm:w-auto bg-white text-black hover:bg-slate-200 rounded-full px-8 py-6 text-sm md:text-md font-bold transition-transform active:scale-95"
+              className="w-full sm:w-auto bg-white text-black hover:bg-zinc-200 rounded-full px-8 py-7 text-md font-black transition-all hover:scale-[1.02] active:scale-95 shadow-xl shadow-white/5"
             >
               <PlusCircle className="mr-2 h-5 w-5" /> START NEW INTERVIEW
             </Button>
           </div>
-          <div className="relative shrink-0 w-full sm:w-2/3 lg:w-1/3 max-w-[320px]">
+          <div className="relative shrink-0 w-full max-w-[300px] hidden md:block">
             <Image
               src="/robot.jpeg"
-              alt="Robot"
-              width={500}
-              height={500}
-              className="rounded-2xl border border-slate-800 object-cover shadow-2xl"
+              alt="Interviewer"
+              width={400}
+              height={400}
+              className="rounded-3xl border border-slate-800 object-cover shadow-2xl rotate-2 hover:rotate-0 transition-transform duration-500"
             />
           </div>
         </section>
 
- <section className="mt-8">
-  {fetching ? (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-      {[1, 2, 3].map((i) => (
-        <div
-          key={i}
-          className="h-48 rounded-2xl bg-slate-900/50 animate-pulse border border-slate-800"
-        />
-      ))}
-    </div>
-  ) : interviews.length > 0 ? (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-      {interviews.map((interview) => (
-        <Card
-          key={interview.id}
-          className="bg-slate-950 border-slate-800 hover:border-indigo-500/50 transition-all group flex flex-col"
-        >
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <div className="flex flex-col gap-1">
-              <Badge
-                variant="outline"
-                className="w-fit border-indigo-500/30 text-indigo-400 text-[10px] bg-indigo-500/5"
-              >
-                {/* Updated to show techStack or fallback to role from your DB */}
-                {interview.techStack || interview.role || "General"}
-              </Badge>
-              {/* Added a small label for the Role seen in your DB */}
-              {interview.role && (
-                 <span className="text-[9px] text-slate-500 uppercase tracking-wider px-1">
-                   {interview.role}
-                 </span>
-              )}
+        {/* --- Interviews Grid --- */}
+        <section>
+          <div className="flex items-center justify-between mb-8 px-2">
+            <h3 className="text-xl font-bold flex items-center gap-2">
+              <History size={18} className="text-indigo-500" /> Recent Sessions
+            </h3>
+          </div>
+
+          {fetching ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-56 rounded-[2rem] bg-zinc-900/50 animate-pulse border border-zinc-800" />
+              ))}
             </div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-xl md:text-2xl font-bold text-white">
-                {interview.score}
-              </span>
-              <span className="text-[10px] text-slate-500">/100</span>
+          ) : interviews.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {interviews.map((interview) => (
+                <Card key={interview.id} className="bg-zinc-950 border-zinc-800 hover:border-indigo-500/40 transition-all group flex flex-col rounded-[2rem] overflow-hidden">
+                  <CardHeader className="flex flex-row items-center justify-between pb-4">
+                    <div className="flex flex-col gap-1">
+                      <Badge variant="outline" className="w-fit border-indigo-500/30 text-indigo-400 text-[10px] bg-indigo-500/5 px-2">
+                        {interview.techStack || "General"}
+                      </Badge>
+                      <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">{interview.role || "Developer"}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-2xl font-black text-white">{interview.score}</span>
+                      <span className="text-[10px] text-zinc-600 block">/100</span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="flex-1 pb-6">
+                    <p className="text-zinc-400 text-sm line-clamp-3 italic leading-relaxed">
+                      &quot;{interview.feedback || "Preparing your detailed analysis report..."}&quot;
+                    </p>
+                  </CardContent>
+                  <CardFooter className="bg-zinc-900/50 p-4">
+                    <Link href={`/dashboard/analysis/${interview.id}`} className="w-full">
+                      <Button variant="ghost" className="w-full justify-between text-zinc-300 hover:text-white text-xs h-10 group/btn">
+                        Detailed Report <ChevronRight size={14} className="group-hover/btn:translate-x-1 transition-transform" />
+                      </Button>
+                    </Link>
+                  </CardFooter>
+                </Card>
+              ))}
             </div>
-          </CardHeader>
-          <CardContent className="flex-1">
-            <p className="text-slate-400 text-xs md:text-sm line-clamp-3 italic leading-relaxed">
-              &quot;{interview.feedback || "Processing AI insights..."}&quot;
-            </p>
-          </CardContent>
-          <CardFooter className="pt-2">
-            <Link
-              href={`/dashboard/analysis/${interview.id}`}
-              className="w-full"
-            >
-              <Button
-                variant="secondary"
-                className="w-full justify-between bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800 text-xs h-9"
-              >
-                Detailed Analysis <ChevronRight size={14} />
+          ) : (
+            <div className="border border-dashed border-zinc-800 rounded-[2.5rem] py-24 text-center bg-zinc-950/30">
+              <Trophy className="mx-auto h-12 w-12 text-zinc-800 mb-4" />
+              <p className="text-zinc-500 mb-6">Your interview history is empty.</p>
+              <Button variant="outline" onClick={() => router.push("/interview")} className="border-zinc-800 text-zinc-400 rounded-xl hover:bg-zinc-900">
+                Record your first session
               </Button>
-            </Link>
-          </CardFooter>
-        </Card>
-      ))}
-    </div>
-  ) : (
-    <div className="border border-dashed border-slate-800 rounded-[1.5rem] md:rounded-[2rem] py-16 md:py-20 text-center bg-slate-950/50 px-4">
-      <Trophy className="mx-auto h-10 w-10 text-slate-700 mb-4" />
-      <p className="text-slate-500 mb-6 text-sm">
-        Your history is looking a bit empty.
-      </p>
-      <Button
-        variant="outline"
-        onClick={() => router.push("/dashboard/interview")}
-        className="border-slate-700 text-slate-400 text-xs hover:bg-slate-900"
-      >
-        Record your first session
-      </Button>
-    </div>
-  )}
-</section>
-        <section className="pt-6 border-t border-slate-900">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="lg:col-span-2 bg-slate-950 border-slate-800 p-6 md:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-              <div className="w-full sm:w-auto">
-                <h4 className="text-lg md:text-xl font-bold text-white mb-2 flex items-center gap-2">
-                  <Globe className="text-indigo-500" size={18} /> Community
-                  Insights
-                </h4>
-                <p className="text-xs md:text-sm text-slate-500 max-w-sm">
-                  Global benchmark for 2026. See how your scores compare to
-                  others.
-                </p>
-                <div className="mt-6 flex gap-6 md:gap-8">
-                  <div>
-                    <p className="text-[9px] md:text-[10px] uppercase tracking-widest text-slate-600 font-bold mb-1">
-                      Global Avg
-                    </p>
-                    <p className="text-xl md:text-2xl font-black text-indigo-400">
-                      {communityStats.avgScore}%
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[9px] md:text-[10px] uppercase tracking-widest text-slate-600 font-bold mb-1">
-                      Trending Stack
-                    </p>
-                    <p className="text-xl md:text-2xl font-black text-yellow-500 flex items-center gap-1">
-                      <Zap size={14} fill="currentColor" />{" "}
-                      {communityStats.topStack}
-                    </p>
-                  </div>
+            </div>
+          )}
+        </section>
+
+        {/* --- Insights Footer --- */}
+        <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card className="lg:col-span-2 bg-zinc-950 border-zinc-800 p-8 rounded-[2rem] flex flex-col sm:flex-row items-center justify-between gap-8">
+            <div className="flex-1">
+              <h4 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                <Globe className="text-indigo-500" size={20} /> Community Benchmarks
+              </h4>
+              <p className="text-sm text-zinc-500 max-w-sm">Comparing your performance against 2,000+ active candidates.</p>
+              <div className="mt-8 flex gap-10">
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest text-zinc-600 font-bold mb-1">Global Average</p>
+                  <p className="text-3xl font-black text-white">{communityStats.avgScore}%</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest text-zinc-600 font-bold mb-1">Trending Stack</p>
+                  <p className="text-3xl font-black text-yellow-500 flex items-center gap-2">
+                    <Zap size={18} fill="currentColor" /> {communityStats.topStack}
+                  </p>
                 </div>
               </div>
-              <Link href="/dashboard/community" className="w-full sm:w-auto">
-                <Button className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-6 py-5 md:py-0 text-xs md:text-sm">
-                  Explore Network <ChevronRight size={16} />
-                </Button>
-              </Link>
-            </Card>
+            </div>
+            <Link href="/dashboard/community">
+              <Button className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl px-8 py-6 font-bold shadow-lg shadow-indigo-600/20">
+                Network Stats <ChevronRight size={18} className="ml-1" />
+              </Button>
+            </Link>
+          </Card>
 
-            <Card
-              className={`border-slate-800 p-6 md:p-8 flex flex-col justify-center transition-colors ${
-                interviews.length > 0 ? "bg-slate-950" : "bg-slate-900/30"
-              }`}
-            >
-              <p className="text-indigo-400 text-[10px] md:text-xs font-bold uppercase mb-2">
-                Your Standing
-              </p>
-              <h2 className="text-3xl md:text-4xl font-black text-white mb-4">
-                {standing.label}
-              </h2>
-              <Progress value={standing.value} className="h-1 bg-slate-900" />
-              <p className="text-slate-600 text-[9px] md:text-[10px] mt-4 italic">
-                {standing.sub}
-              </p>
-            </Card>
-          </div>
+          <Card className="bg-zinc-950 border-zinc-800 p-8 rounded-[2rem] flex flex-col justify-center">
+            <p className="text-indigo-400 text-[10px] font-black uppercase mb-2 tracking-[0.2em]">User Standing</p>
+            <h2 className="text-4xl font-black text-white mb-4">{standing.label}</h2>
+            <Progress value={standing.value} className="h-1.5 bg-zinc-900" />
+            <p className="text-zinc-600 text-[10px] mt-4 italic leading-relaxed">{standing.sub}</p>
+          </Card>
         </section>
+
       </main>
     </div>
   );
