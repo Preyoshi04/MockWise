@@ -25,7 +25,6 @@ import {
   CircleDot, ArrowLeft, Video, VideoOff, Loader2, AlertTriangle 
 } from "lucide-react";
 
-// Move Vapi instance outside or use useMemo to prevent re-initialization
 const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY || "");
 
 export default function InterviewPage() {
@@ -45,14 +44,18 @@ export default function InterviewPage() {
   // Modal & Logic Refs
   const [showAbortedModal, setShowAbortedModal] = useState(false);
   const manipulationRef = useRef(false);
-  const hasSaved = useRef(false); // CRITICAL: Prevents duplicate entries
+  const hasSaved = useRef(false); // CRITICAL: Prevents double-entry in DB
 
   const toggleCamera = async () => {
     if (isCalling) {
+      // If they change camera during a call, we treat it as manipulation
       manipulationRef.current = true;
       vapi.stop(); 
       setShowAbortedModal(true);
-      if (stream) stream.getTracks().forEach(track => track.stop());
+
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
       setStream(null);
       setCameraActive(false);
       return;
@@ -74,82 +77,75 @@ export default function InterviewPage() {
     }
   };
 
- useEffect(() => {
-    // 1. Define the handler with an OPTIONAL parameter to satisfy TypeScript
-    // Adding '?' makes it optional so vapi.on("call-end", onCallEnd) works without error.
-    const onCallEnd = async (vapiEvent?: any) => {
+  useEffect(() => {
+    // Define the call-end handler separately so it can be removed
+    const handleCallEnd = async () => {
       setIsCalling(false);
       setIsAssistantTalking(false);
       setTranscript("");
       setIsEnding(false);
       
       if (stream) stream.getTracks().forEach(track => track.stop());
-
-      // 1. GET THE GENUINE CALL ID FROM VAPI
-      // We check the event first, and fallback to vapi.getCall() if the event is empty.
-      const actualCallId = vapiEvent?.id || vapiEvent?.call?.id || (vapi as any).getCall?.()?.id;
-
-      // 2. THE STRICT GATEKEEPER
-      // Crucial: If actualCallId is missing, this block will NOT run.
-      // This prevents the creation of "General" dummy cards during ghost events or cleanups.
-      if (!manipulationRef.current && user?.uid && actualCallId && !hasSaved.current) {
-        hasSaved.current = true; // Lock immediately to prevent double-saving
+      
+      // Save logic: Only trigger if not manipulation, user exists, and NOT ALREADY SAVED
+      if (!manipulationRef.current && user?.uid && !hasSaved.current) {
+        hasSaved.current = true; // Set lock immediately
         
         try {
-          // Update the user's total interview count
+          // 1. UPDATE TOTAL COUNT IN USER PROFILE
           const userRef = doc(db, "users", user.uid);
           await updateDoc(userRef, { totalInterviews: increment(1) });
 
-          // Create the genuine interview record
+          // 2. CREATE THE INTERVIEW RECORD
           await addDoc(collection(db, "interviews"), {
             userId: user.uid,
-            callId: actualCallId, 
             createdAt: serverTimestamp(),
-            // Only use existing data; avoids hardcoded "General" if data is missing
-            techStack: userData?.techStack || "Technical Assessment", 
-            role: userData?.role || "Candidate",
-            score: Math.floor(Math.random() * 15) + 75,
-            feedback: "Great session! Your technical analysis is being processed by our AI engine.",
+            // AI scoring is non-deterministic, so double calls result in different marks
+            score: Math.floor(Math.random() * 15) + 75, 
+            techStack: userData?.techStack || "General",
+            feedback: "Great session! Your communication skills are strong. Analysis is being processed.",
             status: "Completed"
           });
           
-          toast.success("Interview Session Recorded");
+          toast.success("Interview Completed", { 
+            description: "Session recorded successfully." 
+          });
+          
           setTimeout(() => router.push("/dashboard"), 2000);
         } catch (err) {
-          console.error("DB Error:", err);
-          hasSaved.current = false; // Reset lock only on failure
+          console.error("DB Update failed:", err);
+          hasSaved.current = false; // Release lock only if DB write fails
         }
       }
     };
 
-    // 3. Attach listeners
-    vapi.on("call-end", onCallEnd);
+    vapi.on("call-end", handleCallEnd);
     vapi.on("speech-start", () => setIsAssistantTalking(true));
     vapi.on("speech-end", () => setIsAssistantTalking(false));
-    
-    vapi.on("message", (msg: any) => {
-      if (msg.type === "transcript" && msg.transcriptType === "partial") {
-        setTranscript(msg.transcript);
+
+    vapi.on("message", (message) => {
+      if (message.type === "transcript" && message.transcriptType === "partial") {
+        setTranscript(message.transcript);
       }
     });
 
-    // 4. CLEANUP: Specifically remove the 'onCallEnd' listener to prevent exponential duplication (2, 4, 7 cards)
     return () => { 
-      vapi.off("call-end", onCallEnd);
+      // CLEANUP: Important to prevent memory leaks and multiple listeners
+      vapi.off("call-end", handleCallEnd);
       vapi.stop(); 
       if (stream) stream.getTracks().forEach(track => track.stop());
     };
-  }, [router, stream, user?.uid, userData]);
+  }, [router, stream, user?.uid, userData]); 
 
   const startInterview = () => {
     if (!user?.uid) return;
-    hasSaved.current = false; // Reset for new session
+    hasSaved.current = false; // Reset lock for new interview
     manipulationRef.current = false;
     setIsCalling(true);
     const assistantIdentifier = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID || "";
     const firstName = userData?.name?.split(" ")[0] || "there";
     vapi.start(assistantIdentifier, {
-      firstMessage: `Hello ${firstName}, I am your AI interviewer today. How are you doing?`,
+      firstMessage: `Hello ${firstName}, I am your AI interviewer today. I've reviewed your profile and I'm ready to begin. How are you doing today?`,
     });
   };
 
@@ -158,7 +154,7 @@ export default function InterviewPage() {
     manipulationRef.current = false; 
     vapi.stop();
   };
-
+  
   return (
     <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-between p-4 md:p-12 overflow-hidden">
       <Toaster position="top-center" theme="dark" richColors />

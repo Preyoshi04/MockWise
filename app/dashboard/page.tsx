@@ -226,85 +226,83 @@ export default function Dashboard() {
           </div>
         </section>
 
-        <section>
-          <div className="flex items-center justify-center gap-3 mb-6 md:mb-8">
-            <div className="p-2 bg-slate-900 rounded-lg border border-slate-800">
-              <History size={25} className="text-slate-400" />
-            </div>
-            <h3 className="text-xl md:text-2xl font-bold text-slate-300 tracking-tight uppercase">
-              Recent Sessions
-            </h3>
-          </div>
-
-          {fetching ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="h-48 rounded-2xl bg-slate-900/50 animate-pulse border border-slate-800"
-                />
-              ))}
-            </div>
-          ) : interviews.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {interviews.map((interview) => (
-                <Card
-                  key={interview.id}
-                  className="bg-slate-950 border-slate-800 hover:border-slate-700 transition-all group flex flex-col"
-                >
-                  <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                    <Badge
-                      variant="outline"
-                      className="border-slate-700 text-slate-400 text-[10px]"
-                    >
-                      {interview.techStack || "General"}
-                    </Badge>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-xl md:text-2xl font-bold text-white">
-                        {interview.score}
-                      </span>
-                      <span className="text-[10px] text-slate-500">/100</span>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="flex-1">
-                    <p className="text-slate-400 text-xs md:text-sm line-clamp-3 italic leading-relaxed">
-                      &quot;{interview.feedback || "Processing AI insights..."}
-                      &quot;
-                    </p>
-                  </CardContent>
-                  <CardFooter className="pt-2">
-                    <Link
-                      href={`/dashboard/analysis/${interview.id}`}
-                      className="w-full"
-                    >
-                      <Button
-                        variant="secondary"
-                        className="w-full justify-between bg-slate-900 text-slate-300 border-slate-800 text-xs h-9"
-                      >
-                        Detailed Analysis <ChevronRight size={14} />
-                      </Button>
-                    </Link>
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="border border-dashed border-slate-800 rounded-[1.5rem] md:rounded-[2rem] py-16 md:py-20 text-center bg-slate-950/50 px-4">
-              <Trophy className="mx-auto h-10 w-10 text-slate-700 mb-4" />
-              <p className="text-slate-500 mb-6 text-sm">
-                Your history is looking a bit empty.
-              </p>
-              <Button
+ <section className="mt-8">
+  {fetching ? (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {[1, 2, 3].map((i) => (
+        <div
+          key={i}
+          className="h-48 rounded-2xl bg-slate-900/50 animate-pulse border border-slate-800"
+        />
+      ))}
+    </div>
+  ) : interviews.length > 0 ? (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {interviews.map((interview) => (
+        <Card
+          key={interview.id}
+          className="bg-slate-950 border-slate-800 hover:border-indigo-500/50 transition-all group flex flex-col"
+        >
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <div className="flex flex-col gap-1">
+              <Badge
                 variant="outline"
-                onClick={() => router.push("/dashboard/interview")}
-                className="border-slate-700 text-slate-400 text-xs"
+                className="w-fit border-indigo-500/30 text-indigo-400 text-[10px] bg-indigo-500/5"
               >
-                Record your first session
-              </Button>
+                {/* Updated to show techStack or fallback to role from your DB */}
+                {interview.techStack || interview.role || "General"}
+              </Badge>
+              {/* Added a small label for the Role seen in your DB */}
+              {interview.role && (
+                 <span className="text-[9px] text-slate-500 uppercase tracking-wider px-1">
+                   {interview.role}
+                 </span>
+              )}
             </div>
-          )}
-        </section>
-
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl md:text-2xl font-bold text-white">
+                {interview.score}
+              </span>
+              <span className="text-[10px] text-slate-500">/100</span>
+            </div>
+          </CardHeader>
+          <CardContent className="flex-1">
+            <p className="text-slate-400 text-xs md:text-sm line-clamp-3 italic leading-relaxed">
+              &quot;{interview.feedback || "Processing AI insights..."}&quot;
+            </p>
+          </CardContent>
+          <CardFooter className="pt-2">
+            <Link
+              href={`/dashboard/analysis/${interview.id}`}
+              className="w-full"
+            >
+              <Button
+                variant="secondary"
+                className="w-full justify-between bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800 text-xs h-9"
+              >
+                Detailed Analysis <ChevronRight size={14} />
+              </Button>
+            </Link>
+          </CardFooter>
+        </Card>
+      ))}
+    </div>
+  ) : (
+    <div className="border border-dashed border-slate-800 rounded-[1.5rem] md:rounded-[2rem] py-16 md:py-20 text-center bg-slate-950/50 px-4">
+      <Trophy className="mx-auto h-10 w-10 text-slate-700 mb-4" />
+      <p className="text-slate-500 mb-6 text-sm">
+        Your history is looking a bit empty.
+      </p>
+      <Button
+        variant="outline"
+        onClick={() => router.push("/dashboard/interview")}
+        className="border-slate-700 text-slate-400 text-xs hover:bg-slate-900"
+      >
+        Record your first session
+      </Button>
+    </div>
+  )}
+</section>
         <section className="pt-6 border-t border-slate-900">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card className="lg:col-span-2 bg-slate-950 border-slate-800 p-6 md:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
