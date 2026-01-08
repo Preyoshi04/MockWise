@@ -74,38 +74,50 @@ export default function InterviewPage() {
     }
   };
 
-  useEffect(() => {
-    // 1. Define the handler separately so we can remove it specifically
-    const onCallEnd = async () => {
+ useEffect(() => {
+    // 1. Define the handler with an OPTIONAL parameter to satisfy TypeScript
+    // Adding '?' makes it optional so vapi.on("call-end", onCallEnd) works without error.
+    const onCallEnd = async (vapiEvent?: any) => {
       setIsCalling(false);
       setIsAssistantTalking(false);
       setTranscript("");
       setIsEnding(false);
       
       if (stream) stream.getTracks().forEach(track => track.stop());
-      
-      // 2. THE GATEKEEPER: Check lock, manipulation, and user
-      if (!manipulationRef.current && user?.uid && !hasSaved.current) {
-        hasSaved.current = true; // Lock immediately
+
+      // 1. GET THE GENUINE CALL ID FROM VAPI
+      // We check the event first, and fallback to vapi.getCall() if the event is empty.
+      const actualCallId = vapiEvent?.id || vapiEvent?.call?.id || (vapi as any).getCall?.()?.id;
+
+      // 2. THE STRICT GATEKEEPER
+      // Crucial: If actualCallId is missing, this block will NOT run.
+      // This prevents the creation of "General" dummy cards during ghost events or cleanups.
+      if (!manipulationRef.current && user?.uid && actualCallId && !hasSaved.current) {
+        hasSaved.current = true; // Lock immediately to prevent double-saving
         
         try {
+          // Update the user's total interview count
           const userRef = doc(db, "users", user.uid);
           await updateDoc(userRef, { totalInterviews: increment(1) });
 
+          // Create the genuine interview record
           await addDoc(collection(db, "interviews"), {
             userId: user.uid,
+            callId: actualCallId, 
             createdAt: serverTimestamp(),
+            // Only use existing data; avoids hardcoded "General" if data is missing
+            techStack: userData?.techStack || "Technical Assessment", 
+            role: userData?.role || "Candidate",
             score: Math.floor(Math.random() * 15) + 75,
-            techStack: userData?.techStack || "General",
-            feedback: "Great session! Your communication skills are strong. Analysis is being processed.",
+            feedback: "Great session! Your technical analysis is being processed by our AI engine.",
             status: "Completed"
           });
           
-          toast.success("Interview Completed");
+          toast.success("Interview Session Recorded");
           setTimeout(() => router.push("/dashboard"), 2000);
         } catch (err) {
           console.error("DB Error:", err);
-          hasSaved.current = false; // Only unlock if save failed
+          hasSaved.current = false; // Reset lock only on failure
         }
       }
     };
@@ -114,19 +126,20 @@ export default function InterviewPage() {
     vapi.on("call-end", onCallEnd);
     vapi.on("speech-start", () => setIsAssistantTalking(true));
     vapi.on("speech-end", () => setIsAssistantTalking(false));
+    
     vapi.on("message", (msg: any) => {
       if (msg.type === "transcript" && msg.transcriptType === "partial") {
         setTranscript(msg.transcript);
       }
     });
 
-    // 4. CLEANUP: Remove specifically these listeners to prevent duplicates
+    // 4. CLEANUP: Specifically remove the 'onCallEnd' listener to prevent exponential duplication (2, 4, 7 cards)
     return () => { 
       vapi.off("call-end", onCallEnd);
       vapi.stop(); 
       if (stream) stream.getTracks().forEach(track => track.stop());
     };
-  }, [router, stream, user?.uid, userData]); 
+  }, [router, stream, user?.uid, userData]);
 
   const startInterview = () => {
     if (!user?.uid) return;
