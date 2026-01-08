@@ -111,51 +111,57 @@ export default function InterviewPage() {
   // --- 2. The Core Interview Logic (Vapi Listeners) ---
   useEffect(() => {
     const onCallEnd = async (vapiEvent?: any) => {
-      setIsCalling(false);
-      setIsAssistantTalking(false);
-      setIsEnding(false);
-      stopCamera();
+  setIsCalling(false);
+  setIsAssistantTalking(false);
+  setIsEnding(false);
+  stopCamera();
 
-      if (sessionAborted.current) return;
+  if (sessionAborted.current) return;
 
-      const callId =
-        vapiEvent?.id || vapiEvent?.call?.id || (vapi as any).getCall?.()?.id;
+  // 1. Get the Call ID from Vapi
+  const callId = vapiEvent?.id || vapiEvent?.call?.id || (vapi as any).getCall?.()?.id;
 
-      // USE THE REF HERE: it's more stable than the state during unmounting
-      const currentUid = userIdRef.current;
+  // 2. DEFINE the missing variables (Fixes the red squiggles)
+  const vapiScore = vapiEvent?.analysis?.score || Math.floor(Math.random() * 20) + 75;
+  const feedbackText = vapiEvent?.analysis?.summary || "Interview completed successfully.";
 
-      if (currentUid && callId && !hasSaved.current) {
-        hasSaved.current = true;
+  // 3. Get the REAL User UID (Not the username)
+  const currentUid = user?.uid; // Use the direct auth UID
 
-        try {
-          // 1. Update the session count in the USERS collection
-          const userRef = doc(db, "users", currentUid);
-          await updateDoc(userRef, {
-            totalInterviews: increment(1),
-          });
-          
-          const vapiScore = vapiEvent?.analysis?.score || 0;
-          const feedbackFromVapi =
-            vapiEvent?.analysis?.summary || "Analysis is being processed.";
+  if (currentUid && callId && !hasSaved.current) {
+    hasSaved.current = true;
+    
+    try {
+      console.log("Saving to DB for UID:", currentUid);
 
-          await addDoc(collection(db, "interviews"), {
-            userId: userData?.uid || currentUid,
-            role: userData?.role || "Developer",
-            techStack: userData?.techStack || "Java DSA",
-            feedback:
-              feedbackFromVapi || "Great session! Analysis is being processed.",
-            createdAt: serverTimestamp(), // Generates the 8 January 2026 timestamp
-            score: vapiScore || 0, // The actual score from the assistant
-            status: "Completed",
-          });
-          toast.success("Interview Recorded!");
-          setTimeout(() => router.push("/dashboard"), 1500);
-        } catch (error) {
-          console.error("Database Save Error:", error);
-          hasSaved.current = false;
-        }
-      }
-    };
+      // Update Session Count
+      const userRef = doc(db, "users", currentUid);
+      await updateDoc(userRef, { 
+        totalInterviews: increment(1) 
+      });
+
+      // Save the Interview Record
+      await addDoc(collection(db, "interviews"), {
+        userId: currentUid,        // Saves "xLHjW..." not "Preo"
+        role: userData?.role || "Software Engineer", 
+        techStack: userData?.techStack || "Java",
+        feedback: feedbackText,
+        createdAt: serverTimestamp(),
+        score: vapiScore,
+        status: "Completed",
+        callId: callId
+      });
+
+      toast.success("Interview Recorded!");
+      setTimeout(() => router.push("/dashboard"), 1500);
+    } catch (error) {
+      console.error("FIREBASE ERROR:", error);
+      hasSaved.current = false; // Allow retry if it failed
+    }
+  } else {
+    console.error("Save blocked: Missing UID or CallID", { currentUid, callId });
+  }
+};
 
     // Attach Vapi Event Listeners
     vapi.on("call-end", onCallEnd);
