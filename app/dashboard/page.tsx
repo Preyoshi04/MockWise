@@ -62,11 +62,14 @@ export default function Dashboard() {
       if (!user) return;
       setFetching(true);
       try {
-        const q = query(
-          collection(db, "interviews"),
-          where("userId", "==", user.uid),
-          orderBy("createdAt", "desc")
-        );
+        // ADD THE FIXED QUERY HERE
+    const q = query(
+      collection(db, "interviews"),
+      where("userId", "==", user.uid),
+      where("techStack", "!=", "General"), // This hides the dummy cards
+      orderBy("techStack"),                // Required by Firestore for the != filter
+      orderBy("createdAt", "desc")
+    );
         const querySnapshot = await getDocs(q);
         const userDocs = querySnapshot.docs.map((doc) => ({
           id: doc.id,
