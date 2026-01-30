@@ -7,6 +7,9 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "MockWise",
+  icons: {
+    icon: '/logo.png', 
+  },
   description: "AI Mock Interview Platform",
 };
 

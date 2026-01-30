@@ -9,166 +9,168 @@ import { useRouter } from "next/navigation";
 import { toast, Toaster } from "sonner";
 import { db } from "@/lib/firebase";
 import {
-  doc,
-  updateDoc,
-  increment,
-  addDoc,
-  collection,
-  serverTimestamp,
+  doc,
+  updateDoc,
+  increment,
+  addDoc,
+  collection,
+  serverTimestamp,
 } from "firebase/firestore";
 
 // Shadcn + Lucide Components
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Mic,
-  MicOff,
-  ShieldCheck,
-  CircleDot,
-  ArrowLeft,
-  Video,
-  VideoOff,
-  AlertTriangle,
+  Mic,
+  MicOff,
+  ShieldCheck,
+  CircleDot,
+  ArrowLeft,
+  Video,
+  VideoOff,
+  AlertTriangle,
 } from "lucide-react";
 
 // Initialize Vapi once
 const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY || "");
 
 export default function InterviewPage() {
-  const { user } = useAuth();
-  const { userData } = useUser();
-  const router = useRouter();
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const { user } = useAuth();
+  const { userData } = useUser();
+  const router = useRouter();
+  const videoRef = useRef<HTMLVideoElement>(null); // --- States ---
 
-  // --- States ---
-  const [isCalling, setIsCalling] = useState(false);
-  const [isAssistantTalking, setIsAssistantTalking] = useState(false);
-  const [transcript, setTranscript] = useState("");
-  const [cameraActive, setCameraActive] = useState(false);
-  const [stream, setStream] = useState<MediaStream | null>(null);
-  const [isEnding, setIsEnding] = useState(false);
+  const [isCalling, setIsCalling] = useState(false);
+  const [isAssistantTalking, setIsAssistantTalking] = useState(false);
+  const [transcript, setTranscript] = useState("");
+  const [cameraActive, setCameraActive] = useState(false);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [isEnding, setIsEnding] = useState(false); // --- Modals & Guard Refs ---
 
-  // --- Modals & Guard Refs ---
-  const [showAbortedModal, setShowAbortedModal] = useState(false);
-  const sessionAborted = useRef(false);
-  const hasSaved = useRef(false);
-  const initialCameraState = useRef<boolean | null>(null);
+  const [showAbortedModal, setShowAbortedModal] = useState(false);
+  const sessionAborted = useRef(false);
+  const hasSaved = useRef(false);
+  const initialCameraState = useRef<boolean | null>(null);
 
-  const userIdRef = useRef<string | null>(null);
+  const userIdRef = useRef<string | null>(null); // --- 1. Camera Logic (With Manipulation Detection) ---
 
-  // --- 1. Camera Logic (With Manipulation Detection) ---
-  const toggleCamera = async () => {
-    // If the user tries to toggle camera while calling, they are manipulating the session
-    if (isCalling) {
-      handleManipulation();
-      return;
-    }
+  const toggleCamera = async () => {
+    // If the user tries to toggle camera while calling, they are manipulating the session
+    if (isCalling) {
+      handleManipulation();
+      return;
+    }
 
-    if (cameraActive) {
-      stopCamera();
-    } else {
-      try {
-        const mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-        });
-        setStream(mediaStream);
-        if (videoRef.current) videoRef.current.srcObject = mediaStream;
-        setCameraActive(true);
-      } catch (err) {
-        toast.error("Camera Error", {
-          description: "Please enable camera access.",
-        });
-      }
-    }
-  };
+    if (cameraActive) {
+      stopCamera();
+    } else {
+      try {
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+        });
+        setStream(mediaStream);
+        if (videoRef.current) videoRef.current.srcObject = mediaStream;
+        setCameraActive(true);
+      } catch (err) {
+        toast.error("Camera Error", {
+          description: "Please enable camera access.",
+        });
+      }
+    }
+  };
 
-  const stopCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
-    }
-    setStream(null);
-    setCameraActive(false);
-  };
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+    }
+    setStream(null);
+    setCameraActive(false);
+  };
 
-  const handleManipulation = () => {
-    sessionAborted.current = true;
-    vapi.stop(); // Immediately end the Vapi call
-    stopCamera();
-    setShowAbortedModal(true);
-    toast.error("Session Cancelled", {
-      description: "Camera manipulation detected.",
-    });
-  };
+  const handleManipulation = () => {
+    sessionAborted.current = true;
+    vapi.stop(); // Immediately end the Vapi call
+    stopCamera();
+    setShowAbortedModal(true);
+    toast.error("Session Cancelled", {
+      description: "Camera manipulation detected.",
+    });
+  }; // --- 2. The Core Interview Logic (Vapi Listeners) ---
 
-  // --- 2. The Core Interview Logic (Vapi Listeners) ---
-  useEffect(() => {
-  const onCallEnd = async () => {
-      setIsCalling(false);
-      stopCamera();
+  useEffect(() => {
+    const onCallEnd = async () => {
+      setIsCalling(false);
+      stopCamera();
 
-      if (sessionAborted.current) return;
+      if (sessionAborted.current) return; // FIX: We REMOVED the addDoc() logic here.
+      // Why? Because your Vapi Tool (evaluate_interview) is already
+      // saving the data. We just need to redirect the user now.
 
-      // FIX: We REMOVED the addDoc() logic here.
-      // Why? Because your Vapi Tool (evaluate_interview) is already 
-      // saving the data. We just need to redirect the user now.
-      
-      toast.success("Interview finished! Syncing with dashboard...");
-      
-      // Wait 3 seconds to give the Vapi Tool time to write to Firestore
-      setTimeout(() => {
-        router.push("/dashboard");
-      }, 3000);
-    };
+      try {
+        const currentUid = user?.uid || userIdRef.current;
+        if (currentUid) {
+          // Targets the specific user document to increment their total count
+          const userRef = doc(db, "users", currentUid);
+          await updateDoc(userRef, {
+            totalInterviews: increment(1),
+          });
+        }
+      } catch (error) {
+        console.error("Counter Update Error:", error);
+        // We don't block the redirect even if the counter fails
+      }
+      toast.success("Interview finished! Syncing with dashboard..."); // Wait 3 seconds to give the Vapi Tool time to write to Firestore
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 3000);
+    };
 
-    vapi.on("call-end", onCallEnd);
-    vapi.on("speech-start", () => setIsAssistantTalking(true));
-    vapi.on("speech-end", () => setIsAssistantTalking(false));
-    vapi.on("message", (msg: any) => {
-      if (msg.type === "transcript" && msg.transcriptType === "partial") {
-        setTranscript(msg.transcript);
-      }
-    });
-    // Attach Vapi Event Listeners
-    return () => {
-      vapi.off("call-end", onCallEnd);
-      vapi.stop();
-      stopCamera();
-    };
-  }, [user, router]); // Reduced dependencies to prevent re-renders
+    vapi.on("call-end", onCallEnd);
+    vapi.on("speech-start", () => setIsAssistantTalking(true));
+    vapi.on("speech-end", () => setIsAssistantTalking(false));
+    vapi.on("message", (msg: any) => {
+      if (msg.type === "transcript" && msg.transcriptType === "partial") {
+        setTranscript(msg.transcript);
+      }
+    }); // Attach Vapi Event Listeners
+    return () => {
+      vapi.off("call-end", onCallEnd);
+      vapi.stop();
+      stopCamera();
+    };
+  }, [user, router, userData]); // Reduced dependencies to prevent re-renders
+  // --- 3. Interview Controls ---
 
-  // --- 3. Interview Controls ---
- const startInterview = () => {
-    if (!user?.uid) return toast.error("Please log in first.");
+  const startInterview = () => {
+    if (!user?.uid) return toast.error("Please log in first.");
 
-    userIdRef.current = user.uid;
-    sessionAborted.current = false;
-    setIsCalling(true);
-    
-    const assistantId = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID || "";
-    const name = userData?.name?.split(" ")[0] || "Candidate";
+    userIdRef.current = user.uid;
+    sessionAborted.current = false;
+    setIsCalling(true);
+    const assistantId = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID || "";
+    const name = userData?.name?.split(" ")[0] || "Candidate";
 
-    vapi.start(assistantId, {
-      firstMessage: `Hello ${name}, I am your AI interviewer. Let's begin the session.`,
-      // This sends the real ID to your Vapi Tool so it stops saving "{{userId}}"
-      variableValues: {
-        userId: user.uid,
-      },
-    });
-  };
+    vapi.start(assistantId, {
+      firstMessage: `Hello ${name}, I am your AI interviewer. Let's begin the session.`, // This sends the real ID to your Vapi Tool so it stops saving "{{userId}}"
+      variableValues: {
+        userId: user.uid,
+      },
+    });
+  };
 
-  const endInterview = () => {
-    setIsEnding(true);
-    vapi.stop();
-  };
-return (
+  const endInterview = () => {
+    setIsEnding(true);
+    vapi.stop();
+  };
+  return (
     <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-between p-4 md:p-12 overflow-x-hidden">
       <Toaster position="top-center" richColors theme="dark" />
 
@@ -205,10 +207,14 @@ return (
           onClick={() => router.back()}
           className="text-zinc-500 hover:text-white px-2 md:px-4"
         >
-          <ArrowLeft className="mr-2 h-4 w-4" /> <span className="hidden xs:inline">Exit Room</span>
+          <ArrowLeft className="mr-2 h-4 w-4" />{" "}
+          <span className="hidden xs:inline">Exit Room</span>
         </Button>
         <div className="flex gap-2 md:gap-4">
-          <Badge variant="outline" className="border-zinc-800 text-zinc-500 text-[10px] md:text-xs">
+          <Badge
+            variant="outline"
+            className="border-zinc-800 text-zinc-500 text-[10px] md:text-xs"
+          >
             <ShieldCheck size={12} className="text-emerald-500 mr-1" /> Secure
           </Badge>
           {isCalling && (
@@ -303,12 +309,11 @@ return (
             {isEnding
               ? "PROCESSING..."
               : isCalling
-              ? "END INTERVIEW"
-              : "START INTERVIEW"}
+                ? "END INTERVIEW"
+                : "START INTERVIEW"}
           </Button>
         </div>
       </div>
     </div>
   );
 }
-

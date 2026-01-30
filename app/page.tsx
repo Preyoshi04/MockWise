@@ -4,6 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight, Sparkles, Mic, BarChart3, ShieldCheck, SparklesIcon } from "lucide-react";
+import Image from "next/image";
 
 export default function LandingPage() {
   const { user } = useAuth();
@@ -21,7 +22,7 @@ export default function LandingPage() {
 
           {/* Left Side: Logo */}
           <div className="flex items-center gap-2 shrink-0">
-            <SparklesIcon size={24} className="md:w-[30px] md:h-[30px] text-white" />
+             <Image src="/logo.png" alt="MockWise Logo" width={80} height={80}  />
             <h1 className="text-xl md:text-4xl font-bold tracking-tighter italic text-white">
               MockWise
             </h1>

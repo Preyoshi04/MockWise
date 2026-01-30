@@ -176,7 +176,7 @@ export default function Dashboard() {
       <header className="border-b border-slate-800 bg-black/50 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <SparklesIcon size={20} className="text-indigo-500 md:w-6 md:h-6" />
+            <Image src="/logo.png" alt="MockWise Logo" width={80} height={80} className="object-contain" />
             <h1 className="text-lg md:text-2xl font-bold tracking-tighter italic text-white">MockWise</h1>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
