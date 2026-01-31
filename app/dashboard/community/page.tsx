@@ -55,7 +55,7 @@ export default function CommunityInsights() {
                     userScores = userSnapshot.docs.map(d => Number(d.data().score) || 0);
                 }
 
-                const newsResponse = await fetch("https://hn.algolia.com/api/v1/search_by_date?tags=story&query=software+ai+coding+system&hitsPerPage=5");
+                const newsResponse = await fetch("https://hn.algolia.com/api/v1/search_by_date?tags=story&query=software,ai,coding,interview,companies&hitsPerPage=5");
                 if (newsResponse.ok) {
                     const newsData = await newsResponse.json();
                     setTrendingNews(newsData.hits.map((story: any) => ({

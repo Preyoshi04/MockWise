@@ -119,7 +119,6 @@ export default function Dashboard() {
     }
   } catch (err: any) {
     console.error("Dashboard Fetch Error:", err.message);
-    // REMINDER: If the screen is blank, check the F12 console for the Firebase Index link!
   } finally {
     setFetching(false);
   }
