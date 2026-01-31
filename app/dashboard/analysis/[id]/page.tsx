@@ -6,19 +6,18 @@ import { doc, getDoc } from "firebase/firestore";
 
 // UI Components
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { 
-  ArrowLeft, 
-  Award, 
-  BookOpen, 
-  Target, 
-  CheckCircle2, 
-  Calendar, 
-  Sparkles,
-  Quote,
-  Loader2
+import {
+  ArrowLeft,
+  Target,
+  Cpu,
+  Zap,
+  ShieldCheck,
+  Terminal,
+  Activity,
+  ChevronRight,
+  Loader2,
 } from "lucide-react";
 
 export default function AnalysisPage() {
@@ -43,124 +42,202 @@ export default function AnalysisPage() {
 
   if (loading) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-black text-white">
-        <Loader2 className="h-8 w-8 animate-spin text-zinc-500 mb-4" />
-        <p className="text-zinc-500 animate-pulse">Generating Report...</p>
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-[#050505] text-white">
+        <div className="relative flex items-center justify-center">
+          <div className="absolute h-16 w-16 border-t-2 border-indigo-500 rounded-full animate-spin" />
+          <Cpu className="h-6 w-6 text-indigo-400 animate-pulse" />
+        </div>
+        <p className="mt-8 text-zinc-500 font-mono text-sm tracking-widest uppercase">
+          Getting your analysis ready...
+        </p>
       </div>
     );
   }
 
-  if (!data) return <div className="min-h-screen bg-black text-white flex items-center justify-center">Analysis not found.</div>;
+  if (!data)
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        NO INTERVIEW DATA FOUND. PLEASE GIVE AN INTERVIEW TO GENERATE ANALYSIS.
+      </div>
+    );
 
   return (
-    <div className="min-h-screen bg-black text-zinc-100 p-6 md:p-12 relative overflow-hidden">
-      {/* Background Accent */}
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none" />
+    <div className="min-h-screen bg-[#050505] text-zinc-100 p-4 md:p-8 font-sans selection:bg-indigo-500/30">
+      {/* Dynamic Grid Background */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
 
-      <div className="max-w-5xl mx-auto relative z-10">
-        {/* Navigation */}
-        <Button 
-          variant="ghost" 
-          onClick={() => router.back()} 
-          className="mb-10 text-zinc-500 hover:text-white hover:bg-zinc-900 transition-all gap-2"
-        >
-          <ArrowLeft size={16} /> Back to Dashboard
-        </Button>
-
-        {/* Top Section: Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-12">
-          
-          {/* Circular Score Badge */}
-          <Card className="md:col-span-4 bg-zinc-950 border-zinc-800 flex flex-col items-center justify-center p-8 text-center relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-yellow-500 to-transparent opacity-50" />
-            <Award className="h-10 w-10 text-yellow-500 mb-4" />
-            <h3 className="text-zinc-500 text-xs font-bold uppercase tracking-[0.2em] mb-2">Performance Score</h3>
-            <div className="relative">
-                <p className="text-7xl font-black text-white tracking-tighter">{data.score}%</p>
-                <div className="absolute -inset-4 bg-yellow-500/10 blur-2xl rounded-full -z-10" />
-            </div>
-          </Card>
-
-          {/* Role Header */}
-          <Card className="md:col-span-8 bg-zinc-950 border-zinc-800 p-8 flex flex-col justify-center">
-            <div className="flex items-center gap-2 mb-4">
-                <Badge className="bg-indigo-500/10 text-indigo-400 border-indigo-500/20 px-3 py-1">
-                    Interview Analysis
-                </Badge>
-                <Badge variant="outline" className="border-zinc-800 text-zinc-500">
-                    ID: {id?.toString().slice(0, 8)}
-                </Badge>
-            </div>
-            <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight mb-6">
-                {data.role || "Technical Interview"}
-            </h1>
-            <div className="flex flex-wrap gap-4">
-              <div className="flex items-center gap-2 text-zinc-400 bg-zinc-900/50 px-4 py-2 rounded-xl border border-zinc-800">
-                <Target size={16} className="text-blue-400" />
-                <span className="text-sm font-medium">{data.level}</span>
+      <div className="max-w-6xl mx-auto relative z-10">
+        {/* Header Navigation */}
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-12">
+          <div>
+            <Button
+              variant="ghost"
+              onClick={() => router.back()}
+              className="mb-4 -ml-4 text-zinc-500 hover:text-white hover:bg-zinc-900 transition-all gap-2 font-mono text-xs uppercase tracking-tighter"
+            >
+              <ArrowLeft size={14} /> Go Back To Dashboard
+            </Button>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+                <Activity className="text-indigo-500 h-5 w-5" />
               </div>
-              <div className="flex items-center gap-2 text-zinc-400 bg-zinc-900/50 px-4 py-2 rounded-xl border border-zinc-800">
-                <BookOpen size={16} className="text-purple-400" />
-                <span className="text-sm font-medium">{data.techStack}</span>
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight text-white uppercase">
+                  {data.role}
+                </h1>
               </div>
-              <div className="flex items-center gap-2 text-zinc-400 bg-zinc-900/50 px-4 py-2 rounded-xl border border-zinc-800">
-                <Calendar size={16} className="text-zinc-500" />
-                <span className="text-sm font-medium">
-                    {data.createdAt?.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <Badge
+              variant="outline"
+              className="border-emerald-500/20 bg-emerald-500/5 text-emerald-500 font-mono"
+            >
+              COMPLETED
+            </Badge>
+          </div>
+        </header>
+
+        {/* Bento Grid Layout */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+          {/* Main Score Module */}
+          <div className="md:col-span-4 bg-zinc-900/40 border border-zinc-800 rounded-3xl p-8 flex flex-col items-center justify-center relative group overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+
+            {/* Circular Progress (SVG) */}
+            <div className="relative h-48 w-48 flex items-center justify-center mb-6">
+              <svg className="h-full w-full -rotate-90">
+                <circle
+                  cx="96"
+                  cy="96"
+                  r="88"
+                  stroke="currentColor"
+                  strokeWidth="6"
+                  fill="transparent"
+                  className="text-zinc-800"
+                />
+                <circle
+                  cx="96"
+                  cy="96"
+                  r="88"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  fill="transparent"
+                  strokeDasharray={552.92}
+                  strokeDashoffset={552.92 - (552.92 * data.score) / 100}
+                  className="text-indigo-500 transition-all duration-1000 ease-out"
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-5xl font-black text-white">
+                  {data.score}%
+                </span>
+                <span className="text-[10px] font-mono text-zinc-500 tracking-tighter uppercase">
+                  Overall Score
                 </span>
               </div>
             </div>
-          </Card>
+
+            <div className="w-full space-y-3">
+              <div className="flex justify-between text-[10px] font-mono text-zinc-500 uppercase">
+                <span>Tech Confidence</span>
+                <span>{data.score > 70 ? "High" : "Medium"}</span>
+              </div>
+              <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-indigo-500"
+                  style={{ width: `${data.score}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Metadata & Quick Stats */}
+          <div className="md:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-zinc-900/40 border border-zinc-800 rounded-3xl p-6 flex flex-col justify-between">
+              <ShieldCheck className="text-indigo-500 h-6 w-6 mb-4" />
+              <div>
+                <h4 className="text-zinc-500 text-xs font-mono uppercase mb-1">
+                  EXPERIENCE LEVEL
+                </h4>
+                <p className="text-xl font-bold text-white uppercase">
+                  {data.level}
+                </p>
+              </div>
+            </div>
+            <div className="bg-zinc-900/40 border border-zinc-800 rounded-3xl p-6 flex flex-col justify-between">
+              <Terminal className="text-zinc-500 h-6 w-6 mb-4" />
+              <div>
+                <h4 className="text-zinc-500 text-xs font-mono uppercase mb-1">
+                  TECHSTACK
+                </h4>
+                <p className="text-lg font-semibold text-white truncate">
+                  {data.techStack || data.techstack}
+                </p>
+              </div>
+            </div>
+            <div className="bg-zinc-900/40 border border-zinc-800 rounded-3xl p-6 sm:col-span-2 flex items-center justify-between group cursor-default">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-2xl bg-zinc-800 flex items-center justify-center text-zinc-400 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
+                  <Zap size={20} />
+                </div>
+                <div>
+                  <h4 className="text-white font-bold">Improvement Strategy</h4>
+                  <p className="text-zinc-500 text-xs font-mono">
+                    AI generated growth roadmap
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="text-zinc-700" />
+            </div>
+          </div>
+
+          {/* The Neural Report (The Feedback) */}
+          <div className="md:col-span-12 mt-4 bg-zinc-900/40 border border-zinc-800 rounded-[2.5rem] overflow-hidden">
+            <div className="px-8 py-6 border-b border-zinc-800 flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-indigo-500 animate-pulse" />
+              <h2 className="text-sm font-mono uppercase tracking-widest text-zinc-400">
+                YOUR FEEDBACK
+              </h2>
+            </div>
+
+            <div className="p-8 md:p-12">
+              <div className="max-w-3xl">
+                <p className="text-xl md:text-2xl text-zinc-200 font-medium leading-relaxed mb-12">
+                  {data.feedback}
+                </p>
+
+                <div className="border-t border-zinc-800 pt-12">
+                  <div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <Target size={18} className="text-emerald-500" />
+                      <h3 className="text-white font-bold tracking-tight">
+                        What you nailed
+                      </h3>
+                    </div>
+                    <p className="text-zinc-400 text-sm font-semibold leading-7">
+                      Your explanation of the {data.role} workflow felt
+                      incredibly authentic. You have a great way of breaking
+                      down complex logic without getting lost in the weeds—it's
+                      a rare skill that makes you stand out as a {data.level}{" "}
+                      candidate.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Detailed Feedback */}
-        <Card className="bg-zinc-950 border-zinc-800 overflow-hidden shadow-2xl">
-          <div className="bg-zinc-900/50 p-6 border-b border-zinc-800 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-500/10 rounded-lg">
-                    <CheckCircle2 className="text-emerald-500 h-5 w-5" />
-                </div>
-                <h2 className="font-bold text-xl text-white">Neural Feedback Report</h2>
-            </div>
-            <Sparkles className="text-zinc-700 h-5 w-5" />
-          </div>
-          
-          <CardContent className="p-10 relative">
-            <Quote className="absolute top-8 left-6 h-12 w-12 text-zinc-900 -z-0" />
-            <div className="relative z-10">
-                <p className="text-zinc-300 leading-[1.8] text-xl font-medium italic">
-                {data.feedback || "The AI is still processing your response. Please check back in a moment."}
-                </p>
-                
-                <Separator className="my-10 bg-zinc-800" />
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div>
-                        <h4 className="text-white font-bold mb-3 flex items-center gap-2 text-sm uppercase tracking-wider">
-                            <Target size={14} className="text-indigo-400" /> Key Strengths
-                        </h4>
-                        <p className="text-zinc-500 text-sm leading-relaxed">
-                            Based on your technical proficiency and communication style, the AI identified significant alignment with the {data.role} requirements.
-                        </p>
-                    </div>
-                    <div>
-                        <h4 className="text-white font-bold mb-3 flex items-center gap-2 text-sm uppercase tracking-wider">
-                            <Sparkles size={14} className="text-purple-400" /> Next Steps
-                        </h4>
-                        <p className="text-zinc-500 text-sm leading-relaxed">
-                            Review the transcript in your dashboard to identify specific phrases where tone or technical accuracy could be improved.
-                        </p>
-                    </div>
-                </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Footer */}
-        <footer className="mt-12 text-center">
-            <p className="text-zinc-700 text-[10px] font-bold tracking-[0.4em] uppercase">
-                MockWise Neural Analysis &copy; 2026
-            </p>
+        {/* Footer Branding */}
+        <footer className="py-20 border-t border-slate-900 text-center">
+          <p className="text-slate-300 text-sm font-bold tracking-[0.4em] uppercase">
+            Build for the future of hiring
+          </p>
+          <p className="text-slate-300 text-xs font-bold tracking-[0.4em] uppercase">
+            &copy; 2026 MockWise
+          </p>
         </footer>
       </div>
     </div>

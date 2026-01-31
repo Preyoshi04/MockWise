@@ -267,7 +267,7 @@ export default function Dashboard() {
                   </CardContent>
                   <CardFooter className="bg-zinc-900/50 p-3 md:p-4 mt-auto">
                     <Link href={`/dashboard/analysis/${interview.id}`} className="w-full">
-                      <Button variant="ghost" className="w-full justify-between text-zinc-300 hover:text-white text-[10px] md:text-xs h-9 md:h-10 group/btn">
+                      <Button className="w-full justify-between  text-zinc-500 hover:text-white hover:bg-zinc-900 transition-all text-[10px] md:text-xs h-9 md:h-10 group/btn">
                         Detailed Report <ChevronRight size={14} className="group-hover/btn:translate-x-1 transition-transform" />
                       </Button>
                     </Link>
